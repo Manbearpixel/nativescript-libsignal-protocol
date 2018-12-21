@@ -1,0 +1,38 @@
+<Page xmlns="http://schemas.nativescript.org/tns.xsd" loaded="pageLoaded" class="page"
+  xmlns:ui="nativescript-libsignal-protocol">
+  <ScrollView orientation="vertical">
+
+    <StackLayout class="p-20">
+      <Button text="Generate Install" tap="{{ onTapGenerate }}" class="btn btn-primary btn-active" />
+      
+
+      <StackLayout visibility="{{ !!sesh ? 'collapsed' : 'visible' }}" >
+        <Label text="No session loaded" class="t-20 text-center c-black" textWrap="true" />
+      </StackLayout>
+
+      <StackLayout visibility="{{ !!sesh ? 'visible' : 'collapsed' }}" >
+        <Button text="Register" tap="{{ onTapRegister }}" class="btn btn-primary btn-active" />
+        <Button text="Send" tap="{{ onTapSend }}" class="btn btn-primary btn-active" />
+        <Button text="Pull" tap="{{ onTapPull }}" class="btn btn-primary btn-active" />
+
+        <label text="registrationId:" class="t-20 text-center c-black" textWrap="true"/>
+        <label text="{{ sesh.registrationId }}" class="t-20 text-center c-black" textWrap="true"/>
+
+        <label text="deviceId:" class="t-20 text-center c-black" textWrap="true"/>
+        <label text="{{ sesh.deviceId }}" class="t-20 text-center c-black" textWrap="true"/>
+
+        <label text="identityKey:" class="t-20 text-center c-black" textWrap="true"/>
+        <label text="{{ sesh.identity.pubKey }}" class="t-20 text-center c-black" textWrap="true"/>
+
+        <label text="signedPreKeySignature:" class="t-20 text-center c-black" textWrap="true"/>
+        <label text="{{ sesh.signedPreKey.signature }}" class="t-20 text-center c-black" textWrap="true"/>
+
+        <label text="preKey0:" class="t-20 text-center c-black" textWrap="true"/>
+        <label text="{{ sesh.preKeys[0].keyPair.pubKey }}" class="t-20 text-center c-black" textWrap="true"/>
+      </StackLayout>  
+
+      
+
+    </StackLayout>
+  </ScrollView>
+</Page>
