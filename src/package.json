@@ -1,6 +1,6 @@
 {
   "name": "nativescript-libsignal-protocol",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A Libsignal-Protocol wrapper for NativeScript.",
   "main": "libsignal-protocol",
   "typings": "index.d.ts",
@@ -56,7 +56,6 @@
     "semver": "^5.6.0"
   },
   "dependencies": {
-    "events": "^3.0.0"
   },
   "bootstrapper": "nativescript-plugin-seed"
 }
