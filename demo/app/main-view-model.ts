@@ -1,7 +1,8 @@
 import { Observable } from 'tns-core-modules/data/observable';
 import { LibsignalProtocol } from 'nativescript-libsignal-protocol';
 import { Couchbase } from 'nativescript-couchbase-plugin';
-import { request, getFile, getImage, getJSON } from "tns-core-modules/http";
+import TestCore from './test-core';
+
 import {
   getBoolean,
   setBoolean,
@@ -14,15 +15,7 @@ import {
   clear
 } from "tns-core-modules/application-settings";
 
-interface SessionStateOld { 
-  deviceId: number,
-  registrationId: string,
-  identityKeyPair: LibsignalProtocol.Type.IdentityKeyPair,
-  preKeys: any[],
-  signedPreKey: LibsignalProtocol.Type.SignedPreKeyRecord,
-};
-
-interface IdentityKeyPair {
+interface IIdentityKeyPair {
   pubKey: string,
   privKey: string,
   serialized: string
@@ -42,28 +35,13 @@ interface SignedPreKey {
 interface SessionState {
   registrationId: string,
   deviceId: number,
-  identity: IdentityKeyPair,
+  identity: IIdentityKeyPair,
   signedPreKey: SignedPreKey,
   preKeys: any[]
 };
 
-interface MemoryState {
-  deviceId: number,
-  registrationId: string,
-  identityKeyPair: IdentityKeyPair,
-  signedPreKey: SignedPreKey,
-  // needs to be a SignalProtocolStore impl
-  // used to build sessions and handle messages
-  // holds pre-keys for other users
-  store: LibsignalProtocol.InMemorySignalProtocolStore,
-  messages: any[],
-  friends: any[],
-  signalIdentityKeyPair: LibsignalProtocol.Type.IdentityKeyPair
-};
-
-const RECIPIENT_REGISTER_ID = 123;
-const RECIPIENT_DEVICE_ID = 123;
-const API = 'http://95f95557.ngrok.io';
+const SignalKeyHelper = LibsignalProtocol.KeyHelper;
+const Base64Encode = LibsignalProtocol.Util.base64Encode;
 
 export class HelloWorldModel extends Observable {
   public message: string;
@@ -72,65 +50,60 @@ export class HelloWorldModel extends Observable {
   private identityId: any;
   private sessionIdentity: any;
   private _sesh: any;
-  // private memoryStore: LibsignalProtocol.InMemorySignalProtocolStore;
   private memoryState: any;
-  private signalStore: LibsignalProtocol.MemorySignalProtocolStore;
-  private signalAddress: LibsignalProtocol.Type.SignalProtocolAddress;
-  // private libsignalProtocol: LibsignalProtocol;
-  // private keyHelper: KeyHelper;
+  private signalStore;
+  private signalAddress;
 
   constructor() {
     super();
+    
+    // uncomment to clear application setting storage
     // clear();
 
-    console.log('LibsignalProtocol');
+    // output LibsignalProtocol available classes
+    console.log('===- LibsignalProtocol -===');
     console.dir(LibsignalProtocol);
 
-    console.log('keyhelper');
-    console.dir(LibsignalProtocol.KeyHelper);
-
+    // set example database
     this.database = new Couchbase('example');
-    console.dir('database', this.database);
 
+    // set observable model for vanilla nativescript view changes
     this.identityModel = new Observable();
     this.identityModel.set('model', false);
     this.updateSesh(false);
 
-    // this.memoryStore = new LibsignalProtocol.InMemorySignalProtocolStore();
-    // console.dir(this.memoryStore);
-
+    /**
+     * Local session variables...
+     * 
+     * `store` is not a reference to the raw JAVA object, but instead
+     * a wrapped "recreated" class which exposes methods the original
+     * allows.
+     */
     this.memoryState = {
-      // local session vars
       deviceId: null,
       registrationId: null,
       identityKeyPair: null,
       signedPreKey: null,
-      // needs to be a SignalProtocolStore impl
-      // used to build sessions and handle messages
-      // holds pre-keys for other users
       store: new LibsignalProtocol.InMemorySignalProtocolStore(),
       messages: [],
       friends: [],
       signalIdentityKeyPair: null
     };
-    console.dir(this.memoryState);
 
     console.log('--- begin demo ---');
 
-    let test = new LibsignalProtocol.TestCore();
-    test.testBasicSimultaneousInitiate();
+    // Choose your own demo adventure!
+    // Defaults to running with a local session controlled by the Demo application...
 
-    /**
-     * Save IdentityKeyPair
-     * 
-     * setString('identityKeyPair', LibsignalProtocol.Util.arrayBufferToBase64(_identityKeyPair.serialize()));
-     * >> stores as base64 encoded string
-     * >> "CiEF8TsN0GpaQga89AM+Jlr2zhIORu1SC/f9PBE7eE1R7GISIABwEYdKq/TNnBkrOpDcRp5UXjZrDQvmH93pog3oN0pr"
-     * 
-     * importedIdentityKeyPair = getString('identityKeyPair');
-     * RestoredIdentityKeyPair = LibsignalProtocol.KeyHelper.importIdentityKeyPair(importedIdentityKeyPair);
-     *
-     */
+    // Uncomment to demonstrate a new session being generated!
+    // this.demo_generateNewSessionIdentity();
+
+    // Uncomment to demonstrate a sample encrypt/decrypt session between ALICE and BOB
+    // let testCore = new TestCore();
+    // testCore.testBasicSimultaneousInitiate();
+
+    // Uncomment to demonstrate a simple client interface!
+    // this.demo_ClientSessionInit();
   }
 
   get sesh(): any {
@@ -146,101 +119,6 @@ export class HelloWorldModel extends Observable {
 
   private updateSesh(msg: any) {
     this.sesh = msg;
-  }
-
-  private testSession() {
-    let aliceSessionRecord = LibsignalProtocol.Core.createSessionRecord();
-    let bobSessionRecord = LibsignalProtocol.Core.createSessionRecord();
-
-    this.initializeSession(aliceSessionRecord.getSessionState(), bobSessionRecord.getSessionState());
-
-  }
-
-  private initializeSession(aliceSessionState: any, bobSessionState: any) {
-  }
-
-  private name() {
-    let aliceIdentity = LibsignalProtocol.KeyHelper.generateIdentityKeyPair();
-    let bobIdentity = LibsignalProtocol.KeyHelper.generateIdentityKeyPair();    
-
-    let aliceAddress = LibsignalProtocol.KeyHelper.importSignalProtocolAddress(1111, 1);
-    let bobAddress = LibsignalProtocol.KeyHelper.importSignalProtocolAddress(2222, 1);
-
-    console.log(`alice:: register=${aliceAddress.getName()} device=${aliceAddress.getDeviceId()}`);
-    console.log(`bob:: register=${bobAddress.getName()} device=${bobAddress.getDeviceId()}`);
-
-    let aliceStore = new LibsignalProtocol.MemorySignalProtocolStore(aliceIdentity, Number(aliceAddress.getName()));
-    let bobStore = new LibsignalProtocol.MemorySignalProtocolStore(bobIdentity, Number(bobAddress.getName()));
-
-    // aliceStore.storeSession(aliceAddress, 1);
-    // bobStore.storeSession(bobAddress, 1)
-
-    // SignalProtocolStore aliceStore = new TestInMemorySignalProtocolStore();
-    // SignalProtocolStore bobStore   = new TestInMemorySignalProtocolStore();
-
-    // aliceStore.storeSession(new SignalProtocolAddress("+14159999999", 1), aliceSessionRecord);
-    // bobStore.storeSession(new SignalProtocolAddress("+14158888888", 1), bobSessionRecord);
-
-    // SessionCipher     aliceCipher    = new SessionCipher(aliceStore, new SignalProtocolAddress("+14159999999", 1));
-    // SessionCipher     bobCipher      = new SessionCipher(bobStore, new SignalProtocolAddress("+14158888888", 1));
-
-    // byte[]            alicePlaintext = "This is a plaintext message.".getBytes();
-    // CiphertextMessage message        = aliceCipher.encrypt(alicePlaintext);
-    // byte[]            bobPlaintext   = bobCipher.decrypt(new SignalMessage(message.serialize()));
-
-    // assertTrue(Arrays.equals(alicePlaintext, bobPlaintext));
-
-    // byte[]            bobReply      = "This is a message from Bob.".getBytes();
-    // CiphertextMessage reply         = bobCipher.encrypt(bobReply);
-    // byte[]            receivedReply = aliceCipher.decrypt(new SignalMessage(reply.serialize()));
-
-    // assertTrue(Arrays.equals(bobReply, receivedReply));
-
-    // List<CiphertextMessage> aliceCiphertextMessages = new ArrayList<>();
-    // List<byte[]>            alicePlaintextMessages  = new ArrayList<>();
-
-    // for (int i=0;i<50;i++) {
-    //   alicePlaintextMessages.add(("смерть за смерть " + i).getBytes());
-    //   aliceCiphertextMessages.add(aliceCipher.encrypt(("смерть за смерть " + i).getBytes()));
-    // }
-
-    // long seed = System.currentTimeMillis();
-
-    // Collections.shuffle(aliceCiphertextMessages, new Random(seed));
-    // Collections.shuffle(alicePlaintextMessages, new Random(seed));
-
-    // for (int i=0;i<aliceCiphertextMessages.size() / 2;i++) {
-    //   byte[] receivedPlaintext = bobCipher.decrypt(new SignalMessage(aliceCiphertextMessages.get(i).serialize()));
-    //   assertTrue(Arrays.equals(receivedPlaintext, alicePlaintextMessages.get(i)));
-    // }
-
-    // List<CiphertextMessage> bobCiphertextMessages = new ArrayList<>();
-    // List<byte[]>            bobPlaintextMessages  = new ArrayList<>();
-
-    // for (int i=0;i<20;i++) {
-    //   bobPlaintextMessages.add(("смерть за смерть " + i).getBytes());
-    //   bobCiphertextMessages.add(bobCipher.encrypt(("смерть за смерть " + i).getBytes()));
-    // }
-
-    // seed = System.currentTimeMillis();
-
-    // Collections.shuffle(bobCiphertextMessages, new Random(seed));
-    // Collections.shuffle(bobPlaintextMessages, new Random(seed));
-
-    // for (int i=0;i<bobCiphertextMessages.size() / 2;i++) {
-    //   byte[] receivedPlaintext = aliceCipher.decrypt(new SignalMessage(bobCiphertextMessages.get(i).serialize()));
-    //   assertTrue(Arrays.equals(receivedPlaintext, bobPlaintextMessages.get(i)));
-    // }
-
-    // for (int i=aliceCiphertextMessages.size()/2;i<aliceCiphertextMessages.size();i++) {
-    //   byte[] receivedPlaintext = bobCipher.decrypt(new SignalMessage(aliceCiphertextMessages.get(i).serialize()));
-    //   assertTrue(Arrays.equals(receivedPlaintext, alicePlaintextMessages.get(i)));
-    // }
-
-    // for (int i=bobCiphertextMessages.size() / 2;i<bobCiphertextMessages.size(); i++) {
-    //   byte[] receivedPlaintext = aliceCipher.decrypt(new SignalMessage(bobCiphertextMessages.get(i).serialize()));
-    //   assertTrue(Arrays.equals(receivedPlaintext, bobPlaintextMessages.get(i)));
-    // }
   }
 
   private importSessionState(state: SessionState): Promise<any> {
@@ -285,45 +163,205 @@ export class HelloWorldModel extends Observable {
     return Promise.resolve(this.memoryState);
   }
 
-  private generateNewSessionIdentity(): any {
+  /**
+   * Generates a new identity session.
+   * If there was no session previously stored, it will generate a new one.
+   * If there was a session stored, it will restore it.
+   */
+  public async onTapGenerate() {
+    console.log("===- GENERATE -===");
+
+    this.sessionIdentity = {};
+
+    if (hasKey('sessionIdentity')) {
+      console.log("...RESTORING SESSION");
+      try {
+        this.sessionIdentity = JSON.parse(getString('sessionIdentity'));
+      } catch (err) {
+        console.log('...UNABLE TO RESTORE IDENTITY');
+        console.log(err);
+        return;
+      }
+    } else {
+      console.log("...GENERATING SESSION");
+      this.sessionIdentity = this.demo_generateNewSessionIdentity();
+
+      console.log("...SAVING SESSION");
+      setString('sessionIdentity', JSON.stringify(this.sessionIdentity));
+    }
+
+    this.identityId = this.database.createDocument(this.sessionIdentity);
+
+    console.log('SESSION IDENTITY LOADED');
+    console.dir(this.database.getDocument(this.identityId));
+    console.dir(this.sessionIdentity.signedPreKey);
+    this.identityModel.set('model', this.sessionIdentity);
+    this.updateSesh(this.sessionIdentity);
+    
+    await this.importSessionState(this.sessionIdentity);
+  }
+
+  /**
+   * Registers a session "remotely" to a server
+   */
+  public onTapRegister(): void {
+    console.log("===- REGISTER -===");
+
+    if (!this.memoryState.registrationId) {
+      console.log('...no details to register');
+      return;
+    }
+
+    console.log('...pushing to server');
+    this.pushSessionToServer();
+  }
+
+  /**
+   * "Pulls" a session from a server
+   */
+  public onTapPull(): void {
+    console.log("===- Pull -===");
+
+    if (!this.memoryState.registrationId) {
+      console.log('...no details to register');
+      return;
+    }
+
+    console.log('...pulling from server');
+    this.pullFromServer();
+  }
+
+  /**
+   * "Sends" session to a server
+   */
+  public onTapSend(): void {
+    console.log("===- OnTapSend -===");
+
+    if (!this.memoryState.registrationId) {
+      console.log('...no details to register');
+      return;
+    }
+
+    console.log('...pulling from server');
+    this.sendToServer();
+  }
+
+  /**
+   * Outputs a new session identity generated with the Libsignal Protocol.
+   * 
+   * `identityKeyPair` is a raw reference to the JAVA object `IdentityKeyPair`
+   * as such, the exported values must be `serialized` before being usable.
+   * 
+   * @returns The generated session identity as a JSON object.
+   */
+  public demo_generateNewSessionIdentity(): any {
     let identityKeyPair: LibsignalProtocol.Type.IdentityKeyPair;
     let preKeys: any[];
     let signedPreKey: LibsignalProtocol.Type.SignedPreKeyRecord;
     let signedPreKeyPair: LibsignalProtocol.Type.ECKeyPair;
+    let registrationId: number;
     
-    identityKeyPair   = LibsignalProtocol.KeyHelper.generateIdentityKeyPair();
-    preKeys           = LibsignalProtocol.KeyHelper.generatePreKeys(0, 5);
-    signedPreKey      = LibsignalProtocol.KeyHelper.generateSignedPreKey(identityKeyPair, 1, true);
-    signedPreKeyPair  = signedPreKey.getKeyPair();
+    registrationId	  = SignalKeyHelper.generateRegistrationId();
+    identityKeyPair   = SignalKeyHelper.generateIdentityKeyPair();
+    preKeys           = SignalKeyHelper.generatePreKeysFormatted(0, 1);
+    signedPreKey      = SignalKeyHelper.generateSignedPreKeyFormatted(identityKeyPair, 1);
 
-    return {
-      registrationId: `${LibsignalProtocol.KeyHelper.generateRegistrationId()}`,
+    let sessionIdentity = {
+      registrationId: `${registrationId}`,
       deviceId: 123,
       identity: {
-        pubKey: LibsignalProtocol.Util.arrayBufferToBase64(identityKeyPair.getPublicKey().serialize()),
-        privKey: LibsignalProtocol.Util.arrayBufferToBase64(identityKeyPair.getPrivateKey().serialize()),
-        serialized: LibsignalProtocol.Util.arrayBufferToBase64(identityKeyPair.serialize()),
+        pubKey: Base64Encode(identityKeyPair.getPublicKey().serialize()),
+        privKey: Base64Encode(identityKeyPair.getPrivateKey().serialize()),
+        serialized: Base64Encode(identityKeyPair.serialize()),
       },
-      signedPreKey: {
-        keyId: signedPreKey.getId(),
-        keyPair: {
-          pubKey: LibsignalProtocol.Util.base64Encode(signedPreKeyPair.getPublicKey().serialize()),
-          privKey: LibsignalProtocol.Util.arrayBufferToBase64(signedPreKeyPair.getPrivateKey().serialize()),
-        },
-        signature: LibsignalProtocol.Util.arrayBufferToBase64(signedPreKey.getSignature()),
-        serialized: LibsignalProtocol.Util.arrayBufferToBase64(signedPreKey.serialize()),
-      },
+      signedPreKey: signedPreKey,
       preKeys: preKeys
     };
+
+    console.log(sessionIdentity);
+    return sessionIdentity;
+  }
+
+  public async demo_ClientSessionInit() {
+    console.log('===- DEMO -- ClientSession -===');
+    
+    let aliceClient     = new LibsignalProtocol.Client('userAlice', 2222, 123);
+    let aliceClientReg  = aliceClient.exportRegistrationObj();
+
+    let bobClient     = new LibsignalProtocol.Client('userBob', 1111, 123);
+    let bobClientReg  = bobClient.exportRegistrationObj();
+
+    let aliceClientInfo = new LibsignalProtocol.ClientInfo(
+      aliceClientReg.identityPubKey,
+      aliceClientReg.address.registrationId,
+      aliceClientReg.address.deviceId,
+      aliceClientReg.publicPreKeys,
+      aliceClientReg.signedPreKey.id,
+      aliceClientReg.signedPreKey.pubKey,
+      aliceClientReg.signedPreKey.signature
+    );
+
+    let bobClientInfo = new LibsignalProtocol.ClientInfo(
+      bobClientReg.identityPubKey,
+      bobClientReg.address.registrationId,
+      bobClientReg.address.deviceId,
+      bobClientReg.publicPreKeys,
+      bobClientReg.signedPreKey.id,
+      bobClientReg.signedPreKey.pubKey,
+      bobClientReg.signedPreKey.signature
+    );
+
+    let alicePreKeyBundle = aliceClientInfo.getPreKeyBundle();
+    let bobPreKeyBundle   = bobClientInfo.getPreKeyBundle();
+
+    await aliceClient.addSession(bobClientReg.address, bobPreKeyBundle);
+    console.log('...ALICE ADDED BOB SESSION');
+
+    await bobClient.addSession(aliceClientReg.address, alicePreKeyBundle);
+    console.log('...BOB ADDED ALICE SESSION');
+
+
+    console.log('BOB_PREKEY_BUNDLE', bobPreKeyBundle);
+
+    console.log('Test...bob has alice?', bobClient.hasContact(aliceClientReg.address.name));
+    console.log('Test...alice has bob?', aliceClient.hasContact(bobClientReg.address.name));
+
+    let bobToAliceTests = [
+      'pixxlated',
+      'coffee break',
+      'lofi all day',
+      'all work no play',
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut quis ornare velit. Nulla venenatis porta dolor sodales efficitur. Sed ipsum tellus, efficitur ut aliquam sollicitudin, dictum id dui. Aliquam efficitur elit ut mi vehicula, sed cursus elit suscipit. Vestibulum quis ligula in est iaculis consectetur a id urna. Phasellus semper in libero non laoreet. Quisque nec tempor tellus. Nullam non nunc magna. Nullam fringilla, libero non euismod semper, est mauris facilisis erat, quis auctor diam dolor sit amet augue. Mauris interdum interdum leo, et pulvinar felis vulputate eget.'
+    ];
+
+    console.log(`Running ${bobToAliceTests.length} BOB >> ALICE Message Tests...`);
+    try {
+      for (let i=0; i < bobToAliceTests.length; i++) {
+        let testMessage = bobToAliceTests[i];
+        try {
+          let encodedMessage = await bobClient.prepareMessage('userAlice', testMessage).then(bobClient.encodeMessage);
+          let plainTextMessage = await aliceClient.decryptEncodedMessage('userBob', encodedMessage);
+          console.log({
+            test: (i + 1),
+            success: (plainTextMessage === testMessage),
+            encoded: encodedMessage
+          });
+        } catch (err) {
+          console.log('unable to decrypt message');
+          console.log(err);
+        }
+      }
+
+      console.log('...Test complete!');
+    } catch (err) {
+      console.log(err);
+    }
   }
 
   private async pushSessionToServer() {
     console.log("===- PUSH SESSION TO SERVER -===");
-
-    // console.dir(this.memoryState);
-    // console.dir(this.memoryState.store);
     
-    let identity: IdentityKeyPair = await this.memoryState.store.getIdentityKeyPair();
+    let identity: IIdentityKeyPair = await this.memoryState.store.getIdentityKeyPair();
 
     console.dir(this.memoryState.signedPreKey);
 
@@ -350,407 +388,30 @@ export class HelloWorldModel extends Observable {
     console.dir(requestObj);
     console.log('---');
 
-    request({
-      // url: "https://httpbin.org/put",
-      url: `${API}/keys`,
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      content: JSON.stringify(requestObj)
-    }).then((response) => {
-      console.log('-- response');
-      console.dir(response);
-      console.log('-- content');
-      console.log(response.content);
-      console.log('-- content.toJSON');
-      console.dir(response.content.toJSON());
-    }, (e) => {
-      console.log('Error occurred');
-      console.log(e.message ? e.message : e);
-      console.dir(e);
-    });
+    // request({
+    //   url: `${API}`,
+    //   method: "PUT",
+    //   headers: { "Content-Type": "application/json" },
+    //   content: JSON.stringify(requestObj)
+    // }).then((response) => {
+    //   console.log('-- response');
+    //   console.dir(response);
+    //   console.log('-- content');
+    //   console.log(response.content);
+    //   console.log('-- content.toJSON');
+    //   console.dir(response.content.toJSON());
+    // }, (e) => {
+    //   console.log('Error occurred');
+    //   console.log(e.message ? e.message : e);
+    //   console.dir(e);
+    // });
   }
 
   private async sendToServer() {
     console.log("===- SEND TO SERVER -===");
-
-    try {
-      let aliceIdentity = this.generateNewSessionIdentity();
-      let aliceAddress = LibsignalProtocol.Core.createSignalProtocolAddress(aliceIdentity.registrationId, aliceIdentity.deviceId);
-
-      console.log('s1', this.signalStore.getLocalRegistrationId());
-      console.log('s2', this.signalAddress.getName());
-
-      let myAdress = this.signalAddress;
-
-      // Instantiate a SessionBuilder for a remote recipientId + deviceId tuple.
-      
-      // ME
-      // let sessionBuilder = LibsignalProtocol.Core.createSessionBuilder(this.signalStore, this.signalAddress);
-      
-      // let importedSigned = LibsignalProtocol.Core.importSignedPreKey(LibsignalProtocol.Util.base64Decode(this.memoryState.signedPreKey.serialized));
-      
-      // let importedPre = LibsignalProtocol.Core.importPreKeyRecord(LibsignalProtocol.Util.base64Decode(this.memoryState.preKeys[1].serialized));
-
-      // ALICE
-      let sessionBuilder = LibsignalProtocol.Core.createSessionBuilder(this.signalStore, aliceIdentity.signalAddress);
-      
-      let importedSigned = LibsignalProtocol.Core.importSignedPreKey(LibsignalProtocol.Util.base64Decode(aliceIdentity.signedPreKey.serialized));
-      
-      let importedPre = LibsignalProtocol.Core.importPreKeyRecord(LibsignalProtocol.Util.base64Decode(aliceIdentity.preKeys[1].serialized));
-
-      let identityKeyPair = LibsignalProtocol.KeyHelper.importIdentityKeyPair(LibsignalProtocol.Util.base64Decode(aliceIdentity.identity.serialized));
-
-      console.log(LibsignalProtocol.Util.base64Encode(importedSigned.serialize()));
-
-      console.log(importedPre.getId());
-
-      console.dir({
-        redId: aliceIdentity.registrationId,
-        devId: aliceIdentity.deviceId,
-        preId: importedPre.getId(),
-        prePubId: LibsignalProtocol.Util.base64Encode(importedPre.getKeyPair().getPublicKey().serialize()),
-        signedId: importedSigned.getId(),
-        signedPub: LibsignalProtocol.Util.base64Encode(importedSigned.getKeyPair().getPublicKey().serialize()),
-        signedSig: LibsignalProtocol.Util.base64Encode(importedSigned.getSignature()),
-        idKey: LibsignalProtocol.Util.base64Encode(identityKeyPair.getPublicKey().serialize())
-      });
-
-      let preKeyBundle = LibsignalProtocol.Core.createPreKeyBundle(
-        aliceIdentity.registrationId,
-        aliceIdentity.deviceId,
-        importedPre.getId(),
-        importedPre.getKeyPair().getPublicKey(),
-        importedSigned.getId(),
-        importedSigned.getKeyPair().getPublicKey(),
-        importedSigned.getSignature(),
-        identityKeyPair.getPublicKey()
-      );
-
-      console.log('device', preKeyBundle.getDeviceId());
-      console.log('preKey', preKeyBundle.getPreKeyId());
-
-      // Build a session with a PreKey retrieved from the server.
-      sessionBuilder.process(preKeyBundle);
-
-      // // Encrypt a message
-      let recipient = LibsignalProtocol.Core.createSignalProtocolAddress(aliceIdentity.registrationId, aliceIdentity.deviceId);
-
-      console.log('recipient', recipient.getName());
-
-      let sessionCipher = LibsignalProtocol.Core.createSessionCipher(this.signalStore, recipient);
-
-      let foo = new java.lang.String("Hello World!");
-
-      console.log('raw message', foo);
-
-      let message = sessionCipher.encrypt(foo.getBytes("UTF-8"));
-
-      console.log('encrypted message', LibsignalProtocol.Util.base64Encode(message.serialize()));
-
-      console.log('---done');
-    } catch (err) {
-      console.log('UNABLE TO SEND');
-      console.log(err);
-    }
   }
 
   private async pullFromServer() {
     console.log("===- PULL FROM SERVER -===");
-
-    try {
-
-      request({
-        // url: "https://httpbin.org/put",
-        url: `${API}/messages?deviceId=${this.memoryState.deviceId}&registrationId=${await this.memoryState.store.getLocalRegistrationId()}`,
-        method: "GET"
-      }).then(async (response) => {
-        if (response.statusCode !== 200) {
-          console.log('>> BAD RESPONSE');
-          console.log(response.content);
-          return;
-        }
-
-        console.log('...parsing encrypted data');
-        let encryptedMessages = response.content.toJSON();
-        console.dir(encryptedMessages);
-
-
-        // for (let _msg of encryptedMessages) {
-        //   console.log(`...got ${_msg.key}`);
-        // }
-
-        if (!encryptedMessages && encryptedMessages.length === 0) {
-          console.log('>> NO CONTENT');
-          console.log(response.content);
-          return;
-        }
-
-        let encryptedMessage = encryptedMessages[0];
-        let registrationId = Number(encryptedMessage.value.destinationRegistrationId);
-        let deviceId = Number(encryptedMessage.value.destinationDeviceId);
-
-        let fromRegistrationId = Number(encryptedMessage.value.registrationId);
-        let fromDeviceId = Number(encryptedMessage.value.deviceId);
-
-        console.log(`Received message from device [${fromDeviceId}] registration [${fromRegistrationId}]`);
-        console.log(`Message to device [${deviceId}] registration [${registrationId}]`, encryptedMessage);
-
-        let fromAddress, sessionCipher;
-
-        try {
-          fromAddress = LibsignalProtocol.Core.createSignalProtocolAddress(Number(fromRegistrationId), Number(fromDeviceId));
-
-          console.log('fromAddress', fromAddress.getName());
-
-          let msgBytes = new java.lang.String(encryptedMessage.value.ciphertextMessage.body).getBytes();
-          // console.dir(new java.lang.String(encryptedMessage.value.ciphertextMessage.body).getBytes());
-          console.log(msgBytes);
-
-          // console.log(LibsignalProtocol.Util.rawciphertextToBinary(encryptedMessage.value.ciphertextMessage.body));
-
-          // sessionCipher = LibsignalProtocol.Core.createSessionCipher(this.signalStore, fromAddress);
-        } catch (err) {
-          console.log('bad cipher');
-          console.log(err);
-        }
-
-        console.log('encrypted Message');
-        console.log(encryptedMessage.value.ciphertextMessage.body);
-
-        // try {
-        //   let plaintext;
-        //   if (encryptedMessage.value.ciphertextMessage.type === 3) {
-        //     console.log('--- Cipher message type 3: decryptPreKeyWhisperMessage');
-        //     plaintext = await sessionCipher.decrypt(encryptedMessage.value.body);
-        //   } else {
-        //     console.log('--- Cipher message type 1: decryptWhisperMessage');
-        //     plaintext = await sessionCipher.decrypt(encryptedMessage.value.body);
-        //   }
-
-        //   console.log('plaintext?', plaintext);
-        // } catch (err) {
-        //   console.log('unable to decrypt');
-        //   console.log(err);
-        // }
-
-      }, (e) => {
-        console.log('Error occurred');
-        console.log(e.message ? e.message : e);
-        console.dir(e);
-      });
-    } catch(err) {
-      console.log('UNABLE TO PULL');
-      console.log(err);
-    }
-
-
-    //             let fromAddress = new ls.SignalProtocolAddress(Number(registrationId), Number(deviceId));
-    //             let sessionCipher = new ls.SessionCipher(state.store, fromAddress);
-
-    //             console.debug(`Encrypted message:`, message.value.ciphertextMessage.body);
-    //             let plaintext;
-    //             if (message.value.ciphertextMessage.type === 3) {
-    //                 console.debug(`Cipher message type 3: decryptPreKeyWhisperMessage`);
-    //                 plaintext = await sessionCipher.decryptPreKeyWhisperMessage(message.value.ciphertextMessage.body, 'binary');
-    //                 commit('commit-friend', `${deviceId}-${registrationId}`);
-    //             } else if (message.value.ciphertextMessage.type === 1) {
-    //                 console.debug(`Cipher message type 1: decryptWhisperMessage`);
-    //                 plaintext = await sessionCipher.decryptWhisperMessage(message.value.ciphertextMessage.body, 'binary');
-    //             }
-
-    //             let decryptedMessage = util.toString(plaintext);
-    //             console.debug(`Decrypted message:`, decryptedMessage);
-    //             commit('commit-message', {
-    //                 ...message.value,
-    //                 message: decryptedMessage,
-    //             });
-    //             // delete message on receipt
-    //             await api.delete(`/messages?key=${message.key}`);
-    //             console.debug(`Read receipt sent for key:`, message.key);
-    //         }
-    //     }
-    // } catch (ex) {
-    //     console.error(ex);
-    // }
-  }
-
-  public async onTapGenerate() {
-    console.log("===- GENERATE -===");
-
-    this.sessionIdentity = {};
-
-    if (hasKey('sessionIdentity')) {
-      console.log("...RESTORING SESSION");
-      try {
-        this.sessionIdentity = JSON.parse(getString('sessionIdentity'));
-      } catch (err) {
-        console.log('...UNABLE TO RESTORE IDENTITY');
-        console.log(err);
-        return;
-      }
-    } else {
-      console.log("...GENERATING SESSION");
-      this.sessionIdentity = this.generateNewSessionIdentity();
-
-      console.log("...SAVING SESSION");
-      setString('sessionIdentity', JSON.stringify(this.sessionIdentity));
-    }
-
-    this.identityId = this.database.createDocument(this.sessionIdentity);
-
-    console.log('SESSION IDENTITY LOADED');
-    // console.dir(this.sessionIdentity);
-    console.dir(this.database.getDocument(this.identityId));
-    console.dir(this.sessionIdentity.signedPreKey);
-    this.identityModel.set('model', this.sessionIdentity);
-    this.updateSesh(this.sessionIdentity);
-    
-    await this.importSessionState(this.sessionIdentity);
-  }
-
-  public onTapRegister(): void {
-    console.log("===- REGISTER -===");
-
-    if (!this.memoryState.registrationId) {
-      console.log('...no details to register');
-      return;
-    }
-
-    console.log('...pushing to server');
-    this.pushSessionToServer();
-  }
-
-  public onTapPull(): void {
-    console.log("===- Pull -===");
-
-    if (!this.memoryState.registrationId) {
-      console.log('...no details to register');
-      return;
-    }
-
-    console.log('...pulling from server');
-    this.pullFromServer();
-  }
-
-  public onTapSend(): void {
-    console.log("===- Send -===");
-
-    if (!this.memoryState.registrationId) {
-      console.log('...no details to register');
-      return;
-    }
-
-    console.log('...pulling from server');
-    this.sendToServer();
-  }
-
-  public test() {
-    let registrationId, identityKeyPair, prekeys, signedPreKey, _identityKeyPair;
-
-    clear();
-
-    console.log('===- Demo1 -===');
-
-    if (hasKey('registrationId')) {
-      console.log('\t import registrationId');
-    } else {
-      console.log('\t set registrationId');
-      setNumber('registrationId', LibsignalProtocol.KeyHelper.generateRegistrationId());
-    }
-
-    if (hasKey('identityKeyPair')) {
-      console.log('\t import identityKeyPair');
-    } else {
-      _identityKeyPair = LibsignalProtocol.KeyHelper.generateIdentityKeyPair();
-      setString('identityKeyPair', LibsignalProtocol.Util.arrayBufferToBase64(_identityKeyPair.serialize()));
-
-      console.log('\t set identityKeyPair');
-      console.log('\t -- serialize', _identityKeyPair.serialize());
-      
-      console.log('\t -- identityKeyPair.pub', _identityKeyPair.getPublicKey().serialize());
-      console.log('\t -- identityKeyPair.priv', _identityKeyPair.getPrivateKey().serialize());
-
-      console.log('\t -- identityKeyPair.pub64', LibsignalProtocol.Util.arrayBufferToBase64(_identityKeyPair.getPublicKey().serialize()));
-      console.log('\t -- identityKeyPair.priv64', LibsignalProtocol.Util.arrayBufferToBase64(_identityKeyPair.getPrivateKey().serialize()));
-    }
-
-    registrationId  = getNumber('registrationId');
-    identityKeyPair = getString('identityKeyPair');
-
-    // console.log('registrationId', registrationId);
-    console.log('identityKeyPair', identityKeyPair);
-
-    // let buff = LibsignalProtocol.KeyHelper.base64ToArrayBuffer(identityKeyPair);
-    let buff = LibsignalProtocol.Util.base64Decode(identityKeyPair);
-
-    // console.log('buff', buff);
-    let MainIdentityKeyPair = LibsignalProtocol.KeyHelper.importIdentityKeyPair(buff);
-
-    console.log('\t set MainIdentityKeyPair');
-    console.log('\t -- serialize', MainIdentityKeyPair.serialize());
-    console.log('\t -- Exported:', LibsignalProtocol.Util.arrayBufferToBase64(MainIdentityKeyPair.serialize()));
-      
-    console.log('\t -- MainIdentityKeyPair.pub', MainIdentityKeyPair.getPublicKey().serialize());
-    console.log('\t -- MainIdentityKeyPair.priv', MainIdentityKeyPair.getPrivateKey().serialize());
-
-    console.log('\t -- MainIdentityKeyPair.pub64', LibsignalProtocol.Util.arrayBufferToBase64(MainIdentityKeyPair.getPublicKey().serialize()));
-    console.log('\t -- MainIdentityKeyPair.priv64', LibsignalProtocol.Util.arrayBufferToBase64(MainIdentityKeyPair.getPrivateKey().serialize()));
-
-    prekeys = LibsignalProtocol.KeyHelper.generatePreKeys(0, 5);
-
-    console.dir(prekeys);
-
-    signedPreKey = LibsignalProtocol.KeyHelper.generateSignedPreKey(MainIdentityKeyPair, 1, true);
-
-    console.dir(signedPreKey);
-
-    console.log('\t set signedPreKey');
-    console.log('\t -- serialize', signedPreKey.serialize());
-    console.log('\t -- Exported:', LibsignalProtocol.Util.arrayBufferToBase64(signedPreKey.serialize()));
-  
-    console.log('\t -- signedPreKey.sig', signedPreKey.getSignature());
-    console.log('\t -- signedPreKey.sig64', LibsignalProtocol.Util.base64Encode(signedPreKey.getSignature()));
-
-    let exportSignedPreKey = LibsignalProtocol.Util.base64Encode(signedPreKey.serialize());
-
-    let importSigned = LibsignalProtocol.KeyHelper.importSignedPreKeyRecord(LibsignalProtocol.Util.base64Decode(exportSignedPreKey));
-
-    console.log('\t imported signedPreKey');
-    console.log('\t -- serialize', importSigned.serialize());
-    console.log('\t -- serialize64', LibsignalProtocol.Util.base64Encode(importSigned.serialize()));
-  
-    console.log('\t -- signedPreKey.sig', importSigned.getSignature());
-    console.log('\t -- signedPreKey.sig64', LibsignalProtocol.Util.base64Encode(importSigned.getSignature()));
-
-    // console.log('pubkey match', _identityKeyPair.getPublicKey().equals(MainIdentityKeyPair.getPublicKey()));
-    // console.log('privkey match', _identityKeyPair.getPrivateKey().equals(MainIdentityKeyPair.getPrivateKey()));
-    // console.log('identity match', _identityKeyPair.equals(MainIdentityKeyPair));
-
-    let OtherIdentityKeyPair = LibsignalProtocol.KeyHelper.importIdentityKeyPair(LibsignalProtocol.Util.base64Decode(identityKeyPair));
-
-    // console.log('\t set OtherIdentityKeyPair');
-    // console.log('\t -- OtherIdentityKeyPair.pub', OtherIdentityKeyPair.getPublicKey().serialize());
-    // console.log('\t -- OtherIdentityKeyPair.priv', OtherIdentityKeyPair.getPrivateKey().serialize());
-    // console.log('\t -- Exported:', LibsignalProtocol.Util.base64Encode(OtherIdentityKeyPair.serialize()));
-
-    // console.log('---');
-
-    // console.log('pubkey match', _identityKeyPair.getPublicKey().equals(MainIdentityKeyPair.getPublicKey()));
-    // console.log('privkey match', _identityKeyPair.getPrivateKey().equals(MainIdentityKeyPair.getPrivateKey()));
-    // console.log('identity match', _identityKeyPair.equals(MainIdentityKeyPair));
-
-    // console.log('---');
-
-    // console.log('pubkey match', MainIdentityKeyPair.getPublicKey().equals(MainIdentityKeyPair.getPublicKey()));
-    // console.log('privkey match', MainIdentityKeyPair.getPrivateKey().equals(MainIdentityKeyPair.getPrivateKey()));
-    // console.log('identity match', MainIdentityKeyPair.equals(MainIdentityKeyPair));
-
-    // console.log('---');
-
-    // console.log('pubkey match', MainIdentityKeyPair.getPublicKey().equals(OtherIdentityKeyPair.getPublicKey()));
-    // console.log('privkey match', MainIdentityKeyPair.getPrivateKey().equals(OtherIdentityKeyPair.getPrivateKey()));
-    // console.log('identity match', MainIdentityKeyPair.equals(OtherIdentityKeyPair));
-
-    console.dir(MainIdentityKeyPair);
   }
 }

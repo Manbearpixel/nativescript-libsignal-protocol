@@ -12,10 +12,10 @@ import {
   PreKeyStoreDef,
   SignedPreKeyStoreDef,
   PreKeyBundleDef,
-  TestCoreDef,
+  ClientInfoDef,
+  ClientDef,
+  CurveDef,
   MemorySignalProtocolStoreDef } from './libsignal-protocol.common';
-
-import { Buffer } from 'buffer';
 
 declare var org: any;
 
@@ -32,8 +32,6 @@ export namespace LibsignalProtocol {
       };
 
       this.MemoryStore = new org.whispersystems.libsignal.state.impl.InMemorySignalProtocolStore(identityKeyPair, registrationId);
-
-      console.log('!!! CREATED MEMORY STORE !!!');
     }
 
     public getIdentityKeyPair(): TypeDef.IdentityKeyPair {
@@ -127,8 +125,6 @@ export namespace LibsignalProtocol {
 
     constructor(store: MemorySignalProtocolStore, remoteAddress: TypeDef.SignalProtocolAddress) {
       this.CipherStore = new org.whispersystems.libsignal.SessionCipher(store, remoteAddress);
-
-      console.log('!!! CREATED CIPHER STORE !!!');
     }
 
     public encrypt(paddedMessage: any): any {
@@ -140,38 +136,6 @@ export namespace LibsignalProtocol {
       return this.CipherStore.decrypt(ciphertext);
     }
   }
-
-  // export class SessionBuilder implements SessionBuilderDef {
-  //   sessionStore: SessionStoreDef;
-  //   preKeyStore: PreKeyStoreDef;
-  //   signedPreKeyStore: SignedPreKeyStoreDef;
-  //   identityKeyStore: IdentityKeyStoreDef;
-  //   remoteAddress: TypeDef.SignalProtocolAddress;
-
-    
-    
-  //   constructor(store: ISignalProtocolStore, remoteAddress: TypeDef.SignalProtocolAddress) {
-  //     return new org.whispersystems.libsignal.SessionBuilder(store, remoteAddress);
-  //   }
-  // }
-
-  // export class PreKeyBundle implements PreKeyBundleDef {
-  //   public identityKey: TypeDef.IdentityKey;
-  
-  //   constructor(registrationId: number, deviceId: number, preKeyId: number, preKeyPublic: TypeDef.ECPublicKey, signedPreKeyId: number, signedPreKeyPublic: TypeDef.ECPublicKey, signedPreKeySignature: any[], identityKey: TypeDef.IdentityKey);
-
-  //   public getDeviceId(): number {
-
-  //   }
-
-  //   public getPreKeyId(): number;
-  //   public getPreKey(): TypeDef.ECPublicKey;
-  //   public getSignedPreKeyId(): number;
-  //   public getSignedPreKey(): TypeDef.ECPublicKey;
-  //   public getSignedPreKeySignature(): any[];
-  //   public getIdentityKey(): TypeDef.IdentityKey;
-  //   public getRegistrationId(): number;
-  // }
   
   export class InMemorySignalProtocolStore implements InMemorySignalProtocolStoreDef {
     Direction: any;
@@ -242,7 +206,7 @@ export namespace LibsignalProtocol {
         throw new Error('Invalid SignalProtocolAddress string');
       }
 
-      console.log('SAVE IDENTITY', identifier);
+      // console.log('SAVE IDENTITY', identifier);
       
       let parts = identifier.split('.');
       let address = new org.whispersystems.libsignal.SignalProtocolAddress(parts[0], parseInt(parts[1]));
@@ -250,12 +214,10 @@ export namespace LibsignalProtocol {
       let existing = this.get('identityKey' + address.getName());
       this.put('identityKey' + address.getName(), identityKey);
 
-      console.log('...equal?', LibsignalProtocol.Util.isEqualString(identityKey, existing));
+      // console.log('...equal?', LibsignalProtocol.Util.isEqualString(identityKey, existing));
       if (existing && !LibsignalProtocol.Util.isEqualString(identityKey, existing)) {
-        console.log('return true');
         return Promise.resolve(true);
       } else {
-        console.log('return false');
         return Promise.resolve(false);
       }
     }
@@ -417,226 +379,71 @@ export namespace LibsignalProtocol {
     public static isEqualString(value: any, compared: any) {
       return !!(LibsignalProtocol.Util.toString(value) === LibsignalProtocol.Util.toString(compared));
     }
-
-    public static rawciphertextToBinary(value: any): any {
-      return new Buffer(value, 'binary');
-    }
-  }
-
-  export class TestCore implements TestCoreDef {
-    BOB_ADDRESS: TypeDef.SignalProtocolAddress;
-    ALICE_ADDRESS: TypeDef.SignalProtocolAddress;
-
-    aliceSignedPreKey: TypeDef.ECKeyPair;
-    bobSignedPreKey: TypeDef.ECKeyPair;
-
-    // aliceSignedPreKeyAlt: TypeDef.SignedPreKeyRecord;
-    // bobSignedPreKeyAlt: TypeDef.SignedPreKeyRecord;
-
-    aliceSignedPreKeyId: number;
-    bobSignedPreKeyId: number;
-
-    aliceStore: ISignalProtocolStore;
-    bobStore: ISignalProtocolStore;
-    
-    constructor() {
-      this.BOB_ADDRESS    = Core.createSignalProtocolAddress(1111, 1);
-      this.ALICE_ADDRESS  = Core.createSignalProtocolAddress(2222, 1);
-
-      this.aliceStore     = Core.createTestSignalProtocolStore();
-      this.bobStore       = Core.createTestSignalProtocolStore();
-
-      this.aliceSignedPreKey  = org.whispersystems.libsignal.ecc.Curve.generateKeyPair();
-      this.bobSignedPreKey    = org.whispersystems.libsignal.ecc.Curve.generateKeyPair();
-
-      this.aliceSignedPreKeyId  = new java.util.Random().nextInt(0xFFFFFF);//122;//this.aliceSignedPreKeyAlt.getId();
-      this.bobSignedPreKeyId    = new java.util.Random().nextInt(0xFFFFFF);//111;//this.bobSignedPreKeyAlt.getId();
-
-      // this.aliceSignedPreKeyAlt = org.whispersystems.libsignal.util.KeyHelper.generateSignedPreKey(
-      //   this.aliceStore.getIdentityKeyPair(), 1
-      // );
-      
-      // this.bobSignedPreKeyAlt = org.whispersystems.libsignal.util.KeyHelper.generateSignedPreKey(
-      //   this.bobStore.getIdentityKeyPair(), 1
-      // );
-
-      console.log(
-        'aliceReg',
-        this.aliceStore.getLocalRegistrationId(),
-        this.ALICE_ADDRESS.getName()
-      );
-
-      console.log('alice pub', Util.base64Encode(this.aliceStore.getIdentityKeyPair().getPrivateKey().serialize()));
-
-      console.log(
-        'bobReg',
-        this.bobStore.getLocalRegistrationId(),
-        this.BOB_ADDRESS.getName()
-      );
-
-      console.log('bob pub', Util.base64Encode(this.bobStore.getIdentityKeyPair().getPrivateKey().serialize()));
-
-      // console.log(
-      //   'aliceSigned',
-      //   this.aliceSignedPreKeyAlt.getId(),
-      //   Util.base64Encode(this.aliceSignedPreKeyAlt.getSignature())
-      // );
-
-      // console.log(
-      //   'bobSigned',
-      //   this.bobSignedPreKeyAlt.getId(),
-      //   Util.base64Encode(this.bobSignedPreKeyAlt.getSignature())
-      // );
-
-      console.log('--- TestCore Created ---');
-    }
-
-    public testBasicSimultaneousInitiate(): void {
-      console.log('--- TestCore::Running ---');
-      // let aliceStore = Core.createTestSignalProtocolStore();
-      // let bobStore = Core.createTestSignalProtocolStore();
-      console.log('--- TestCore::Stores Created ---');
-      let alicePreKeyBundle = this.createAlicePreKeyBundle(this.aliceStore);
-      let bobPreKeyBundle = this.createBobPreKeyBundle(this.bobStore);
-      console.log('--- TestCore::Bundles Created ---');
-      let aliceSessionBuilder = Core.createSessionBuilder(this.aliceStore, this.BOB_ADDRESS);
-      let bobSessionBuilder   = Core.createSessionBuilder(this.bobStore, this.ALICE_ADDRESS);
-      console.log('--- TestCore::Sessions Built ---');
-      let aliceSessionCipher = Core.createSessionCipher(this.aliceStore, this.BOB_ADDRESS);
-      let bobSessionCipher = Core.createSessionCipher(this.bobStore, this.ALICE_ADDRESS);
-      console.log('--- TestCore::Ciphers Created ---');
-      aliceSessionBuilder.process(bobPreKeyBundle);
-      bobSessionBuilder.process(alicePreKeyBundle);
-      console.log('--- TestCore::Sessions Exchanged ---');
-
-      let bobMessage = new java.lang.String("hey there");
-      let aliceMessage = new java.lang.String("sample message");
-      // let message = sessionCipher.encrypt(foo.getBytes("UTF-8"));
-
-      let messageForBob: TypeDef.CiphertextMessage   = aliceSessionCipher.encrypt(bobMessage.getBytes("UTF-8"));
-      let messageForAlice: TypeDef.CiphertextMessage = bobSessionCipher.encrypt(aliceMessage.getBytes("UTF-8"));
-
-      console.log('--- TestCore::Encrypted ---');
-
-      console.log({
-        who: 'bob',
-        msg: bobMessage.toString(),
-        encrypted: Util.base64Encode(messageForBob.serialize())
-      });
-
-      console.log({
-        who: 'alice',
-        msg: aliceMessage.toString(),
-        encrypted: Util.base64Encode(messageForAlice.serialize())
-      });
-
-      let alicePreKeySignalMessage: TypeDef.PreKeySignalMessage = Core.createPreKeySignalMessage(messageForAlice.serialize());
-
-      // console.dir({
-      //   version: alicePreKeySignalMessage.getMessageVersion(),
-      //   identityPub: Util.base64Encode(alicePreKeySignalMessage.getIdentityKey().getPublicKey().serialize()),
-      //   preKeyId: alicePreKeySignalMessage.getPreKeyId(),
-      //   signedPreKeyId: alicePreKeySignalMessage.getSignedPreKeyId(),
-      //   baseKey: alicePreKeySignalMessage.getBaseKey()
-      // });
-
-      let alicePlaintext = aliceSessionCipher.decrypt(alicePreKeySignalMessage);
-
-      let bobPlaintext   = bobSessionCipher.decrypt(
-        Core.createPreKeySignalMessage(messageForBob.serialize())
-      );
-
-      console.log('--- TestCore::Decryption ---');
-
-      console.log({
-        who: 'bob',
-        msg: bobMessage.toString(),
-        encrypted: Util.base64Encode(messageForBob.serialize()),
-        decrypted: new java.lang.String(bobPlaintext).toString(),
-        matched: new java.lang.String(alicePlaintext).equals("sample message")
-      });
-      
-      console.log({
-        who: 'alice',
-        msg: aliceMessage.toString(),
-        encrypted: Util.base64Encode(messageForAlice.serialize()),
-        decrypted: new java.lang.String(alicePlaintext).toString(),
-        matches: new java.lang.String(bobPlaintext).equals("hey there")
-      });
-    }
-
-    private createAlicePreKeyBundle(aliceStore: MemorySignalProtocolStoreDef): PreKeyBundleDef {
-      let aliceUnsignedPreKey: TypeDef.ECKeyPair = org.whispersystems.libsignal.ecc.Curve.generateKeyPair();
-      let aliceUnsignedPreKeyId: number = new java.util.Random().nextInt(0xFFFFFF);
-      // let aliceSignature: any = this.aliceSignedPreKeyAlt.getSignature();
-      let aliceSignature: any = org.whispersystems.libsignal.ecc.Curve.calculateSignature(
-        aliceStore.getIdentityKeyPair().getPrivateKey(),
-        this.aliceSignedPreKey.getPublicKey().serialize()
-      );
-  
-      let alicePreKeyBundle: PreKeyBundleDef = Core.createPreKeyBundle(
-        Number(this.ALICE_ADDRESS.getName()), this.ALICE_ADDRESS.getDeviceId(),
-        // 1, 1,
-        aliceUnsignedPreKeyId,
-        aliceUnsignedPreKey.getPublicKey(),
-        this.aliceSignedPreKeyId,
-        this.aliceSignedPreKey.getPublicKey(),
-        aliceSignature,
-        aliceStore.getIdentityKeyPair().getPublicKey()
-      );
-
-      aliceStore.storeSignedPreKey(this.aliceSignedPreKeyId, Core.createSignedPreKeyRecord(
-        this.aliceSignedPreKeyId, java.lang.System.currentTimeMillis(), this.aliceSignedPreKey, aliceSignature
-      ));
-      aliceStore.storePreKey(aliceUnsignedPreKeyId, Core.createPreKeyRecord(
-        aliceUnsignedPreKeyId, aliceUnsignedPreKey
-      ));
-  
-      return alicePreKeyBundle;
-    }
-
-    private createBobPreKeyBundle(bobStore: MemorySignalProtocolStoreDef): PreKeyBundleDef {
-      let bobUnsignedPreKey: TypeDef.ECKeyPair = org.whispersystems.libsignal.ecc.Curve.generateKeyPair();
-      let bobUnsignedPreKeyId: number = new java.util.Random().nextInt(0xFFFFFF);
-      // let bobSignature: any = this.bobSignedPreKeyAlt.getSignature();
-      let bobSignature: any = org.whispersystems.libsignal.ecc.Curve.calculateSignature(
-        bobStore.getIdentityKeyPair().getPrivateKey(),
-        this.bobSignedPreKey.getPublicKey().serialize()
-      );
-  
-      let bobPreKeyBundle: PreKeyBundleDef = Core.createPreKeyBundle(
-        Number(this.BOB_ADDRESS.getName()), this.BOB_ADDRESS.getDeviceId(),
-        // 1, 1,
-        bobUnsignedPreKeyId,
-        bobUnsignedPreKey.getPublicKey(),
-        this.bobSignedPreKeyId,
-        this.bobSignedPreKey.getPublicKey(),
-        bobSignature,
-        bobStore.getIdentityKeyPair().getPublicKey()
-      );
-
-      bobStore.storeSignedPreKey(this.bobSignedPreKeyId, Core.createSignedPreKeyRecord(
-        this.bobSignedPreKeyId, java.lang.System.currentTimeMillis(), this.bobSignedPreKey, bobSignature
-      ));
-      bobStore.storePreKey(bobUnsignedPreKeyId, Core.createPreKeyRecord(
-        bobUnsignedPreKeyId, bobUnsignedPreKey
-      ));
-  
-      return bobPreKeyBundle;
-    }
   }
 
   export class Core implements CoreDef {
     static importPreKeyRecord(serialized: any): TypeDef.PreKeyRecord {
-      return new org.whispersystems.libsignal.state.PreKeyRecord(serialized);
+      try {
+        return new org.whispersystems.libsignal.state.PreKeyRecord(serialized);
+      } catch (err) {
+        console.log('ERROR -- Unable to import PreKeyRecord');
+        console.log(err.message ? err.message : '...');
+      }
+      return null;
+    }
+
+    static importSignedPreKeyRecord(serialized: any): TypeDef.SignedPreKeyRecord {
+      try {
+        return new org.whispersystems.libsignal.state.SignedPreKeyRecord(serialized);
+      } catch (err) {
+        console.log('ERROR -- Unable to import SignedPreKeyRecord');
+        console.log(err.message ? err.message : '...');
+      }
+      return null;
     }
 
     static importSignedPreKey(serialized: any): TypeDef.SignedPreKeyRecord {
       return new org.whispersystems.libsignal.state.SignedPreKeyRecord(serialized);
     }
 
+    static importIdentityKey(serialized: any): TypeDef.IdentityKey {
+      try {
+        return new org.whispersystems.libsignal.IdentityKey(serialized, 0);
+      } catch (err) {
+        console.log('ERROR -- Unable to import IdentityKey');
+        console.log(err.message ? err.message : '...');
+      }
+      return null;
+    }
+
+    static importPublicKey(serialized: any): TypeDef.ECPublicKey {
+      try {
+        return org.whispersystems.libsignal.ecc.Curve.decodePoint(serialized, 0);
+      } catch (err) {
+        console.log('ERROR -- Unable to import ECPublicKey');
+        console.log(err.message ? err.message : '...');
+      }
+      return null;
+    }
+
     static createPreKeySignalMessage(serialized: any): TypeDef.PreKeySignalMessage {
-      return new org.whispersystems.libsignal.protocol.PreKeySignalMessage(serialized);
+      try {
+        return new org.whispersystems.libsignal.protocol.PreKeySignalMessage(serialized);
+      } catch (err) {
+        console.log('ERROR -- Unable to create PreKeySignalMessage');
+        console.log(err.message ? err.message : '...');
+      }
+      return null;
+    }
+
+    static createSignalMessage(serialized: any): any {
+      try {
+        return new org.whispersystems.libsignal.protocol.SignalMessage(serialized);
+      } catch (err) {
+        console.log('ERROR -- Unable to create SignalMessage');
+        console.log(err.message ? err.message : '...');
+      }
+      return null;
     }
 
     static createPreKeyRecord(id: number, keyPair: TypeDef.ECKeyPair): TypeDef.PreKeyRecord {
@@ -657,7 +464,7 @@ export namespace LibsignalProtocol {
       }
 
       function generateIdentityKeyPair(): TypeDef.IdentityKeyPair {
-        let keyPair: TypeDef.ECKeyPair = org.whispersystems.libsignal.ecc.Curve.generateKeyPair();
+        let keyPair: TypeDef.ECKeyPair = Curve.generateKeyPair();
         let publicKey: TypeDef.IdentityKey = new org.whispersystems.libsignal.IdentityKey(keyPair.getPublicKey());
         return new org.whispersystems.libsignal.IdentityKeyPair(publicKey, keyPair.getPrivateKey());
       }
@@ -674,8 +481,13 @@ export namespace LibsignalProtocol {
     }
 
     static createSessionBuilder(store: ISignalProtocolStore, address: TypeDef.SignalProtocolAddress): SessionBuilderDef {
-      console.log('creating session builder');
-      return new org.whispersystems.libsignal.SessionBuilder(store, address);
+      try {
+        return new org.whispersystems.libsignal.SessionBuilder(store, address);
+      } catch (err) {
+        console.log('ERROR -- Unable to create SessionBuilder');
+        console.log(err.message ? err.message : '...');
+      }
+      return null;
     }
 
     static createSessionCipher(store: ISignalProtocolStore, address: TypeDef.SignalProtocolAddress): SessionCipherDef {
@@ -690,12 +502,46 @@ export namespace LibsignalProtocol {
       return new org.whispersystems.libsignal.state.SessionRecord();
     }
 
-    static createSignalProtocolAddress(registrationId: number, deviceId: number): TypeDef.SignalProtocolAddress {
-      return new org.whispersystems.libsignal.SignalProtocolAddress(registrationId + '', deviceId);
+    static createSignalProtocolAddress(registrationId: number | string, deviceId: number): TypeDef.SignalProtocolAddress {
+      try {
+        return new org.whispersystems.libsignal.SignalProtocolAddress(registrationId + '', deviceId);
+      } catch (err) {
+        console.log('ERROR -- Unable to create SignalProtocolAddress');
+        console.log(err.message ? err.message : '...');
+      }
+      return null;
     }
 
-    static createPreKeyBundle(registrationId: number, deviceId: number, preKeyId: number, preKeyPublic: TypeDef.ECPublicKey, signedPreKeyId: number, signedPreKeyPublic: TypeDef.ECPublicKey, signedPreKeySignature: any[], identityKey: TypeDef.IdentityKey): PreKeyBundleDef {
-      return new org.whispersystems.libsignal.state.PreKeyBundle(registrationId, deviceId, preKeyId, preKeyPublic, signedPreKeyId, signedPreKeyPublic, signedPreKeySignature, identityKey);
+    static createPreKeyBundle(registrationId: number | string, deviceId: number, preKeyId: number, preKeyPublic: TypeDef.ECPublicKey, signedPreKeyId: number, signedPreKeyPublic: TypeDef.ECPublicKey, signedPreKeySignature: any, identityKey: TypeDef.IdentityKey | any): PreKeyBundleDef {
+      try {
+        return new org.whispersystems.libsignal.state.PreKeyBundle(registrationId, deviceId, preKeyId, preKeyPublic, signedPreKeyId, signedPreKeyPublic, signedPreKeySignature, identityKey);
+      } catch (err) {
+        console.log('ERROR -- Unable to create PreKeyBundle');
+        console.log(err.message ? err.message : '...');
+      }
+      return null;
+    }
+  }
+
+  export class Curve implements CurveDef {
+    static generateKeyPair(): TypeDef.ECKeyPair {
+      try {
+        return new org.whispersystems.libsignal.ecc.Curve.generateKeyPair();
+      } catch (err) {
+        console.log('ERROR -- Unable to generate KeyPair');
+        console.log(err.message ? err.message : '...');
+      }
+      return null;
+    }
+
+    static calculateSignature(signingKey: TypeDef.ECPrivateKey, message: any): any {
+      try {
+        return new org.whispersystems.libsignal.ecc.Curve.calculateSignature(signingKey, message);
+      } catch (err) {
+        console.log('ERROR -- Unable to calculate signature');
+        console.log(err.message ? err.message : '...');
+      }
+      return null;
     }
   }
 
@@ -707,22 +553,27 @@ export namespace LibsignalProtocol {
     }
   
     public static generateIdentityKeyPair(): any {
-      let keyPair: TypeDef.IdentityKeyPair = org.whispersystems.libsignal.util.KeyHelper.generateIdentityKeyPair();
-  
-      return keyPair;
-  
-      // return {
-      //   pubKey: arrayBufferToBase64(keyPair.getPublicKey().serialize()),
-      //   privKey: arrayBufferToBase64(keyPair.getPrivateKey().serialize())
-      // }
-  
-      // let keyPair = org.whispersystems.libsignal.ecc.Curve.generateKeyPair();
-      // let publicKey = new org.whispersystems.libsignal.IdentityKey(keyPair.getPublicKey());
-      // return {
-      //   publicKey: publicKey.serialize(),
-      //   privateKey: keyPair.getPrivateKey().serialize()
-      // };
-      // return org.whispersystems.libsignal.util.KeyHelper.generateIdentityKeyPair();
+      try {
+        return org.whispersystems.libsignal.util.KeyHelper.generateIdentityKeyPair();
+      } catch (err) {
+        console.log('ERROR -- Unable to generate IdentityKeyPair');
+        console.log(err.message ? err.message : '...');
+      }
+      return null;
+    }
+
+    public static generateIdentityKeyPairFormatted(): any {
+      try {
+        let IDKeyPair = org.whispersystems.libsignal.util.KeyHelper.generateIdentityKeyPair();
+        return {
+          pubKey: Util.base64Encode(IDKeyPair.getPublicKey().serialize()),
+          privKey: Util.base64Encode(IDKeyPair.getPrivateKey().serialize()),
+        }
+      } catch (err) {
+        console.log('ERROR -- Unable to generate IdentityKeyPairFormatted');
+        console.log(err.message ? err.message : '...');
+      }
+      return null;
     }
   
     public static generateKeyPair(pubKey: any, privKey: any): TypeDef.ECKeyPair {
@@ -742,61 +593,315 @@ export namespace LibsignalProtocol {
     }
   
     public static generatePreKeys(start: number, count: number): TypeDef.PreKeyRecord[] {
-      let result = [];
-      // List<PreKeyRecord>
-      let keys: any = org.whispersystems.libsignal.util.KeyHelper.generatePreKeys(start, count);
-      
-      // return keys;
-  
-      for (let i=0; i < keys.size(); i++) {
-        let key: TypeDef.PreKeyRecord = keys.get(i);
-        let keyPair: TypeDef.ECKeyPair = key.getKeyPair();
-        result.push({
-          keyId: key.getId(),
-          keyPair: {
-            pubKey: Util.arrayBufferToBase64(keyPair.getPublicKey().serialize()),
-            privKey: Util.arrayBufferToBase64(keyPair.getPrivateKey().serialize())
-          },
-          serialized: Util.base64Encode(key.serialize())
-        });
+      try {
+        return org.whispersystems.libsignal.util.KeyHelper.generatePreKeys(start, count);
+      } catch (err) {
+        console.log('ERROR -- Unable to generate PreKeyBundle');
+        console.log(err.message ? err.message : '...');
       }
-  
-      return result;
+      return null;
+    }
+
+    public static generatePreKeysFormatted(start: number, count: number): any[] {
+      try {
+        let result = [];
+        let preKeys: any = org.whispersystems.libsignal.util.KeyHelper.generatePreKeys(start, count);
+        for (let i=0; i < preKeys.size(); i++) {
+          let key: TypeDef.PreKeyRecord = preKeys.get(i);
+          let keyPair: TypeDef.ECKeyPair = key.getKeyPair();
+          result.push({
+            keyId: key.getId(),
+            keyPair: {
+              pubKey: Util.base64Encode(keyPair.getPublicKey().serialize()),
+              privKey: Util.base64Encode(keyPair.getPrivateKey().serialize())
+            },
+            serialized: Util.base64Encode(key.serialize())
+          });
+        }
+
+        return result;
+      } catch (err) {
+        console.log('ERROR -- Unable to generate PreKeyBundleFormatted');
+        console.log(err.message ? err.message : '...');
+      }
+      return null;
+    }
+
+    public static generateLastResortPreKeyRecord(): TypeDef.PreKeyRecord {
+      let keyPair: TypeDef.ECKeyPair = Curve.generateKeyPair();
+      return new org.whispersystems.libsignal.state.PreKeyRecord(0xFFFFFF, keyPair);
     }
   
-    public static generateSignedPreKey(identityKeyPair: TypeDef.IdentityKeyPair, signedPreKeyId: number, raw?: boolean): any {
-      let signedPreKey: TypeDef.SignedPreKeyRecord = org.whispersystems.libsignal.util.KeyHelper.generateSignedPreKey(identityKeyPair, signedPreKeyId);
-  
-      if (raw) {
-        // let verify = org.whispersystems.libsignal.ecc.Curve.verifySignature(identityKeyPair.getPublicKey(), signedPreKey.getKeyPair().getPublicKey(), signedPreKey.getSignature());
-        // console.log('verfied?', verify);
-        return signedPreKey;
-      } else
+    public static generateSignedPreKey(identityKeyPair: TypeDef.IdentityKeyPair, signedPreKeyId: number): any {
+      try {
+        return org.whispersystems.libsignal.util.KeyHelper.generateSignedPreKey(identityKeyPair, signedPreKeyId);
+      } catch (err) {
+        console.log('ERROR -- Unable to generate SignedPreKey');
+        console.log(err.message ? err.message : '...');
+      }
+      return null;
+    }
+
+    public static generateSignedPreKeyFormatted(identityKeyPair: TypeDef.IdentityKeyPair, signedPreKeyId: number): any {
+      try {
+        let signedPreKey: TypeDef.SignedPreKeyRecord = org.whispersystems.libsignal.util.KeyHelper.generateSignedPreKey(identityKeyPair, signedPreKeyId);
+
         return {
           keyId: signedPreKey.getId(),
           keyPair: {
-            pubKey: Util.arrayBufferToBase64(identityKeyPair.getPublicKey().serialize()),
-            privKey: Util.arrayBufferToBase64(identityKeyPair.getPrivateKey().serialize()),
+            pubKey: Util.base64Encode(signedPreKey.getKeyPair().getPublicKey().serialize()),
+            privKey: Util.base64Encode(signedPreKey.getKeyPair().getPrivateKey().serialize()),
           },
-          signature: Util.arrayBufferToBase64(signedPreKey.getSignature())
+          signature: Util.base64Encode(signedPreKey.getSignature())
         };
+      } catch (err) {
+        console.log('ERROR -- Unable to generate SignedPreKey');
+        console.log(err.message ? err.message : '...');
+      }
+      return null;
     }
   
     public static verifySignedPreKey(signingKey: TypeDef.ECPublicKey, message: any, signature: any): boolean {
-      console.log('signingKey.pub', signingKey.serialize());
-      console.log('signingKey.message', message);
-      console.log('signingKey.signature', signature);
-      let test: boolean = org.whispersystems.libsignal.ecc.Curve.verifySignature(signingKey, message, signature);
-  
-      return test;
+      return org.whispersystems.libsignal.ecc.Curve.verifySignature(signingKey, message, signature);
     }
+  }
+
+  export class ClientInfo implements ClientInfoDef {
+    private identityKey: TypeDef.IdentityKey;
+    private registrationId: number;
+    private deviceId: number;
+    private preKeys: any[];
+    private signedPreKeyId: number;
+    private signedPreKey: TypeDef.ECPublicKey;
+    private signedPreKeySignature; //byte[]
+
+    constructor(identityKey: TypeDef.IdentityKey, registrationId: number, deviceId: number, preKeys: any[], signedPreKeyId: number, signedPreKey: TypeDef.ECPublicKey, signedPreKeySignature: any) {
+      this.identityKey = identityKey;
+      this.registrationId = registrationId;
+      this.deviceId = deviceId;
+      this.preKeys = preKeys;
+      this.signedPreKeyId = signedPreKeyId;
+      this.signedPreKey = signedPreKey;
+      this.signedPreKeySignature = signedPreKeySignature;
+    }
+
+    private fetchPreKey(preKeyIndex) {
+      let preKey = this.preKeys.splice(preKeyIndex, 1);
+      return preKey[0];
+    }
+
+    public getPreKeyBundle() {
+      let random        = new java.util.Random();
+      let preKeyIds     = Object.keys(this.preKeys);
+      let preKeyIndex   = preKeyIds[random.nextInt(preKeyIds.length)];
+      let preKey        = this.fetchPreKey(preKeyIndex);
+
+      return {
+        registrationId: this.registrationId,
+        deviceId: this.deviceId,
+        preKeyPublic: preKey.pubKey,
+        preKeyRecordId: preKey.id,
+        signedPreKeyPublic: this.signedPreKey,
+        signedPreKeyRecordId: this.signedPreKeyId,
+        signature: this.signedPreKeySignature,
+        identityPubKey: this.identityKey
+      }
+    }
+  }
+
+  export class Client implements ClientDef {
+    private random: java.util.Random;
+    private address: TypeDef.SignalProtocolAddress;
+    public store: ISignalProtocolStore;
     
-    // public static generateSignedPreKeyRaw(identityKeyPair: IdentityKeyPair, signedPreKeyId: number): SignedPreKeyRecord {
-    //   let keyPair: ECKeyPair = org.whispersystems.libsignal.ecc.Curve.generateKeyPair();
-    //   // byte[]
-    //   let signature: any = org.whispersystems.curve25519.Curve25519.getInstance(org.whispersystems.curve25519.Curve25519.BEST).calculateSignature(((DjbECPrivateKey) signingKey).getPrivateKey(), message);
-    //   return org.whispersystems.libsignal.util.KeyHelper.generateSignedPreKey(identityKeyPair, signedPreKeyId);
-    // }
+    private publicPreKeys: any[];
+    private privatePreKeys: any[];
+    private signedPreKey: any;
+    private contacts: any;
+
+    public registrationId: number;
+    public username: string;
+    public deviceId: number;
+
+    constructor(clientName: string, registrationId: number, deviceId: number) {
+      this.random = new java.util.Random();
+      this.contacts = {};
+      this.username = clientName;
+      this.deviceId = deviceId;
+      this.registrationId = registrationId;
+
+      // console.log(`>> Starting Client [${clientName}] ID:[${registrationId} Device:[${deviceId}]`);
+      this.address = Core.createSignalProtocolAddress(clientName, deviceId);
+
+      // Generate some keys for usage
+      let identityKeyPair = LibsignalProtocol.KeyHelper.generateIdentityKeyPair();
+      // console.log(`>> Client Identity Public [${Util.base64Encode(identityKeyPair.getPublicKey().serialize())}]`);
+
+      // Generate initial prekeys for client session
+      let preKeys = KeyHelper.generatePreKeysFormatted(this.random.nextInt(0xFFFFFF-101), 100);
+      let lastResortPreKeyRecord = KeyHelper.generateLastResortPreKeyRecord();
+      this.signedPreKey = KeyHelper.generateSignedPreKey(identityKeyPair, this.random.nextInt(0xFFFFFF-1));
+      // console.log(`>> Client Identity Generated 101 preKeys, 1 signedPreKey`);
+
+      this.publicPreKeys = preKeys.map((_key) => {
+        return {
+          id: _key.keyId,
+          pubKey: _key.keyPair.pubKey
+        }
+      });
+
+      this.privatePreKeys = preKeys.map((_key) => {
+        return _key.serialized
+      });
+
+      this.store = Core.createMemorySignalProtocolStore(identityKeyPair, registrationId);
+      // console.log(`>> Client Store created`);
+
+      this.store.storeSignedPreKey(this.signedPreKey.getId(), this.signedPreKey);
+      // console.log(`>> Client Added 1 SignedPreKey to Store`);
+
+      preKeys.forEach((_key) => {
+        let preKeyRecord = Core.importPreKeyRecord(Util.base64Decode(_key.serialized));
+        // console.log(`...storing #${preKeyRecord.getId()}`);
+        this.store.storePreKey(preKeyRecord.getId(), preKeyRecord);
+      });
+      // console.log(`>> Client Added PreKeys to Store`);
+
+      this.store.storePreKey(lastResortPreKeyRecord.getId(), lastResortPreKeyRecord);
+      // console.log(`>> Client Added LastResort PreKey to Store`);
+    }
+
+    public hasContact(contactName: string) {
+      return !!(this.contacts.hasOwnProperty(contactName));
+    }
+
+    public exportRegistrationObj() {
+      return {
+        address: {
+          name: this.address.getName(),
+          deviceId: this.address.getDeviceId(),
+          registrationId: this.store.getLocalRegistrationId()
+        },
+        identityPubKey: Util.base64Encode(this.store.getIdentityKeyPair().getPublicKey().serialize()),
+        signedPreKey: {
+          id: this.signedPreKey.getId(),
+          pubKey: Util.base64Encode(this.signedPreKey.getKeyPair().getPublicKey().serialize()),
+          signature: Util.base64Encode(this.signedPreKey.getSignature())
+        },
+        publicPreKeys: this.publicPreKeys,
+      }
+    }
+
+    public serialize() {
+      let serialize = {
+        client: {
+          registrationId: this.registrationId,
+          username: this.username,
+          deviceId: this.deviceId
+        },
+        contacts: this.contacts.map((_c) => {
+          return {
+            registrationId: _c.registrationId,
+            deviceId: _c.deviceId,
+            preKeyBundle: _c.preKeyBundle,
+            sessionCipher: _c.sessionCipher
+          }
+        }),
+        preKeys: this.privatePreKeys,
+        signedPreKey: Util.base64Encode(this.signedPreKey.serialize()),
+        identityKeyPair: Util.base64Encode(this.store.getIdentityKeyPair().serialize())
+      };
+
+      return JSON.stringify(serialize);
+    }
+
+    public addSession(contact: any, contactBundle: any): Promise<boolean> {
+      try {
+        // console.log(`>> Adding Session [${contact.name}][${contact.deviceId}][${contact.registrationId}] to Address:[${this.address.getName()}]`);
+
+        // recreate SignalProtocolAddress
+        let signalAddress = Core.createSignalProtocolAddress(contact.registrationId, contact.deviceId);
+
+        // recreate PreKeyBundle
+        let preKeyBundle = this.importPreKeyBundle(signalAddress, contactBundle);
+
+        // create SessionBuilder
+        let sessionBuilder = Core.createSessionBuilder(this.store, signalAddress);
+
+        // import the PreKeyBundle into the SessionBuilder
+        sessionBuilder.process(preKeyBundle);
+
+        // create SessionCipher
+        let sessionCipher = Core.createSessionCipher(this.store, signalAddress);
+
+        this.contacts[contact.name] = {
+          registrationId: contact.registrationId,
+          deviceId: contact.deviceId,
+          preKeyBundle: contactBundle,
+          sessionCipher: sessionCipher,
+          signalAddress: signalAddress
+        };
+        
+        return Promise.resolve(true);
+      } catch(err) {
+        console.log(`Unable to add session for [${contact.name}]`);
+        console.log(err.message ? err.message : err);
+        throw new Error('bad_session');
+      }
+    }
+
+    public prepareMessage(contactName: string, message: string): Promise<string> {
+      if (!this.hasContact(contactName)) {
+        throw new Error('missing_contact');
+      }
+
+      let cipher = this.contacts[contactName].sessionCipher;
+      return Promise.resolve(this.encryptMessage(message, cipher));
+    }
+
+    public encodeMessage(message: string): Promise<string> {
+      return Promise.resolve(Util.base64Encode(message));
+    }
+
+    public decodeMessage(message: string): Promise<any> {
+      return Promise.resolve(Util.base64Decode(message));
+    }
+
+    public async decryptEncodedMessage(contactName: string, message: string) {
+      if (!this.hasContact(contactName)) {
+        throw new Error('missing_contact');
+      }
+
+      let decodedMessage = await this.decodeMessage(message);
+      let cipher = this.contacts[contactName].sessionCipher;
+      return Promise.resolve(this.decryptMessage(decodedMessage, cipher));
+    }
+
+    private importPreKeyBundle(signalAddress: any, importedData: any): PreKeyBundleDef {
+      let identityPubKey = Core.importIdentityKey(Util.base64Decode(importedData.identityPubKey));
+
+      return Core.createPreKeyBundle(
+        Number(signalAddress.getName()),
+        Number(signalAddress.getDeviceId()),
+        importedData.preKeyRecordId,
+        Core.importPublicKey(Util.base64Decode(importedData.preKeyPublic)),
+        importedData.signedPreKeyRecordId,
+        Core.importPublicKey(Util.base64Decode(importedData.signedPreKeyPublic)),
+        Util.base64Decode(importedData.signature),
+        identityPubKey
+      );
+    }
+
+    private encryptMessage(message: string, sessionCipher: any): any {
+      let javaStr = new java.lang.String(message);
+      return sessionCipher.encrypt(javaStr.getBytes("UTF-8")).serialize();
+    }
+
+    private decryptMessage(message: any, cipher) {
+      let signalMessage = Core.createPreKeySignalMessage(message);
+      let text = cipher.decrypt(signalMessage);
+      return new java.lang.String(text).toString();
+    }
   }
 }
 

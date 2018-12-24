@@ -12,7 +12,9 @@ import {
   SessionBuilderDef,
   SessionCipherDef,
   PreKeyBundleDef,
-  TestCoreDef,
+  ClientDef,
+  ClientInfoDef,
+  CurveDef,
   CoreDef } from './libsignal-protocol.common';
 
 /**
@@ -140,11 +142,95 @@ export namespace LibsignalProtocol {
     
       constructor(name: string, deviceId: number);
     }
+
+    export class SessionState {
+      MAX_MESSAGE_KEYS: number; // 2000
+      sessionStructure: any;
+  
+      getStructure(): any;
+      getAliceBaseKey(): any[];
+      setAliceBaseKey(aliceBaseKey: any[]);
+      setSessionVersion(version: number): void;
+      getSessionVersion(): number;
+      setRemoteIdentityKey(identityKey: IdentityKey): void;
+      setLocalIdentityKey(identityKey: IdentityKey): void;
+      getRemoteIdentityKey(): IdentityKey;
+      getLocalIdentityKey(): IdentityKey;
+      getPreviousCounter(): number;
+      getRootKey(): any;
+      setRootKey(rootKey: any): void;
+      getSenderRatchetKey(): ECPublicKey;
+      getSenderRatchetKeyPair(): ECKeyPair;
+      hasReceiverChain(senderEphemeral: ECPublicKey): boolean;
+      hasSenderChain(): boolean;
+      getReceiverChainKey(senderEphemeral: ECPublicKey): any;
+      addReceiverChain(senderRatchetKey: ECPublicKey, chainKey: any): void;
+      setSenderChain(senderRatchetKeyPair: ECKeyPair, chainKey: any): void;
+      getSenderChainKey(): any;
+      setSenderChainKey(nextChainKey: any): void;
+      hasMessageKeys(senderEphemeral: ECPublicKey, counter: number): boolean;
+      removeMessageKeys(senderEphemeral: ECPublicKey, counter: number): any;
+      setMessageKeys(senderEphemeral: ECPublicKey, messageKeys: any): void;
+      setReceiverChainKey(senderEphemeral: ECPublicKey, chainKey: any): void;
+      setPendingKeyExchange(sequence: number, ourBaseKey: ECKeyPair, ourRatchetKey: ECKeyPair, ourIdentityKey: IdentityKey): void;
+      getPendingKeyExchangeSequence(): number;
+      getPendingKeyExchangeBaseKey(): ECKeyPair;
+      getPendingKeyExchangeRatchetKey(): ECKeyPair;
+      getPendingKeyExchangeIdentityKey(): IdentityKeyPair;
+      hasPendingKeyExchange(): boolean;
+      setUnacknowledgedPreKeyMessage(preKeyId: any, signedPreKeyId: number, baseKey: ECPublicKey): void;
+      hasUnacknowledgedPreKeyMessage(): boolean;
+      getUnacknowledgedPreKeyMessageItems(): any;
+      clearUnacknowledgedPreKeyMessage(): void;
+      setRemoteRegistrationId(registrationId: number): void;
+      getRemoteRegistrationId(): number;
+      getLocalRegistrationId(): number;
+      serialize(): any[];
+      
+      constructor();
+      constructor(sessionStructure: any);
+      constructor(copy: SessionState);
+    }
+  
+    /**
+     * A SessionRecord encapsulates the state of an ongoing session.
+     *
+     * @author Moxie Marlinspike
+     */
+    export class SessionRecord {
+      ARCHIVED_STATES_MAX_LENGTH: number; //40
+      sessionState: SessionState;
+      previousStates: java.util.LinkedList<SessionState>;
+      fresh: boolean;
+  
+      hasSessionState(version: number, aliceBaseKey: any[]): boolean;
+      getSessionState(): SessionState;
+      getPreviousSessionStates(): java.util.List<SessionState>;
+      removePreviousSessionStates(): void;
+      isFresh(): boolean;
+      archiveCurrentState(): void;
+      promoteState(promotedState: SessionState): void;
+      setState(sessionState: SessionState);
+      serialize(): any[];
+  
+      constructor();
+      constructor(sessionState: SessionState);
+      constructor(serialized: any[]);
+    }
+  }
+
+  export namespace Interface {
+    export interface ISignalProtocolStore extends IdentityKeyStoreDef, PreKeyStoreDef, SessionStoreDef, SignedPreKeyStoreDef  {
+    }
   }
 
   export class Core implements CoreDef {
     static importPreKeyRecord(serialized: any[]): TypeDef.PreKeyRecord;
+    static importSignedPreKeyRecord(serialized: any): TypeDef.SignedPreKeyRecord;
     static importSignedPreKey(serialized: any[]): TypeDef.SignedPreKeyRecord;
+    static importIdentityKey(serialized: any[]): TypeDef.IdentityKey;
+    static importPublicKey(serialized: any): TypeDef.ECPublicKey;
+    static createPreKeySignalMessage(serialized: any): TypeDef.PreKeySignalMessage;
     static createPreKeyRecord(id: number, keyPair: TypeDef.ECKeyPair): TypeDef.PreKeyRecord;
     static createSignedPreKeyRecord(id: number, timestamp: number, keyPair: TypeDef.ECKeyPair, signature: any): TypeDef.SignedPreKeyRecord;
     static createSignalProtocolStore(identityKeyPair: TypeDef.IdentityKeyPair, registrationId: number): MemorySignalProtocolStoreDef;
@@ -157,7 +243,12 @@ export namespace LibsignalProtocol {
     static createSessionRecord(): TypeDef.SessionRecord;
     static createSignalProtocolAddress(registrationId: number, deviceId: number): TypeDef.SignalProtocolAddress;
     static createCiphertextMessage(): TypeDef.CiphertextMessage;
-    static createPreKeyBundle(registrationId: number, deviceId: number, preKeyId: number, preKeyPublic: TypeDef.ECPublicKey, signedPreKeyId: number, signedPreKeyPublic: TypeDef.ECPublicKey, signedPreKeySignature: any[], identityKey: TypeDef.IdentityKey): PreKeyBundleDef;
+    static createPreKeyBundle(registrationId: number, deviceId: number, preKeyId: number, preKeyPublic: TypeDef.ECPublicKey, signedPreKeyId: number, signedPreKeyPublic: TypeDef.ECPublicKey, signedPreKeySignature: any, identityKey: TypeDef.IdentityKey | any): PreKeyBundleDef;
+  }
+
+  export class Curve implements CurveDef {
+    static generateKeyPair(): TypeDef.ECKeyPair;
+    static calculateSignature(signingKey: TypeDef.ECPrivateKey, message: any): any;
   }
 
   export class KeyHelper implements KeyHelperDef {
@@ -180,11 +271,19 @@ export namespace LibsignalProtocol {
      * 
      * @return the generated IdentityKeyPair.
      */
-    static generateIdentityKeyPair(): LibsignalProtocol.Type.IdentityKeyPair;
+    static generateIdentityKeyPair(): TypeDef.IdentityKeyPair;
 
-    static importIdentityKeyPair(serialized: any): LibsignalProtocol.Type.IdentityKeyPair;
+    /**
+     * Generate a formatted identity key pair. Clients should only do this once,
+     * at install time.
+     * 
+     * @return a formatted generation of IdentityKeyPair.
+     */
+    static generateIdentityKeyPairFormatted(): TypeDef.IdentityKeyPair;
+
+    static importIdentityKeyPair(serialized: any): TypeDef.IdentityKeyPair;
   
-    static importSignedPreKeyRecord(serialized: any): LibsignalProtocol.Type.SignedPreKeyRecord;
+    static importSignedPreKeyRecord(serialized: any): TypeDef.SignedPreKeyRecord;
 
     static importSignalProtocolAddress(name: any, deviceId: number): TypeDef.SignalProtocolAddress;
     
@@ -201,6 +300,8 @@ export namespace LibsignalProtocol {
      * @return the list of generated PreKeyRecords.
      */
     static generatePreKeys(start: number, count: number): LibsignalProtocol.Type.PreKeyRecord[];
+
+    static generatePreKeysFormatted(start: number, count: number): TypeDef.PreKeyRecord[];
   
     static generateSignedPreKey(identityKeyPair: LibsignalProtocol.Type.IdentityKeyPair, signedPreKeyId: number, raw?: boolean): any;
   
@@ -221,6 +322,14 @@ export namespace LibsignalProtocol {
     static generatePreKeys(start: number, count: number): LibsignalProtocol.Type.PreKeyRecord[];
 
     /**
+     * Generate the last resort PreKey.  Clients should do this only once, at install
+     * time, and durably store it for the length of the install.
+     *
+     * @return the generated last resort PreKeyRecord.
+     */
+    static generateLastResortPreKey(): TypeDef.PreKeyRecord;
+
+    /**
      * Generate a signed PreKey
      *
      * @param identityKeyPair The local client's identity key pair.
@@ -229,7 +338,9 @@ export namespace LibsignalProtocol {
      * @return the generated signed PreKey
      * @throws InvalidKeyException when the provided identity key is invalid
      */
-    static generateSignedPreKey(identityKeyPair: LibsignalProtocol.Type.IdentityKeyPair, signedPreKeyId: number): LibsignalProtocol.Type.SignedPreKeyRecord;
+    static generateSignedPreKey(identityKeyPair: LibsignalProtocol.Type.IdentityKeyPair, signedPreKeyId: number): TypeDef.SignedPreKeyRecord;
+
+    static generateSignedPreKeyFormatted(identityKeyPair: TypeDef.IdentityKeyPair, signedPreKeyId: number): any;
   }
 
   export class SessionCipher implements SessionCipherDef {
@@ -275,20 +386,6 @@ export namespace LibsignalProtocol {
 
     constructor(store: ISignalProtocolStore, remoteAddress: TypeDef.SignalProtocolAddress);
     constructor(sessionStore: SessionStoreDef, preKeyStore: PreKeyStoreDef, signedPreKeyStore: SignedPreKeyStoreDef, identityKeyStore: IdentityKeyStoreDef, remoteAddress: TypeDef.SignalProtocolAddress);
-  }
-
-  export class TestCore implements TestCoreDef {
-    BOB_ADDRESS: TypeDef.SignalProtocolAddress;
-    ALICE_ADDRESS: TypeDef.SignalProtocolAddress;
-  
-    aliceSignedPreKey: TypeDef.ECKeyPair;
-    bobSignedPreKey: TypeDef.ECKeyPair;
-  
-    aliceSignedPreKeyId: number;
-    bobSignedPreKeyId: number;
-    
-    constructor();
-    public testBasicSimultaneousInitiate(): void;
   }
 
   export class MemorySignalProtocolStore implements ISignalProtocolStore {
@@ -382,6 +479,34 @@ export namespace LibsignalProtocol {
     static base64Decode(base64Str: any): number[];
     static toString(value: any): string;
     static isEqualString(value: any, compared: any): boolean;
-    static rawciphertextToBinary(value: any): any;
+  }
+
+  export class ClientInfo implements ClientInfoDef {
+    constructor(identityKey: TypeDef.IdentityKey, registrationId: number, deviceId: number, preKeys: any[], signedPreKeyId: number, signedPreKey: TypeDef.ECPublicKey, signedPreKeySignature: any);
+  
+    public getPreKeyBundle(): any;
+  }
+  
+  export class Client implements ClientDef {
+    public store: ISignalProtocolStore;
+    public registrationId: number;
+    public username: string;
+    public deviceId: number;
+  
+    constructor(clientName: string, registrationId: number, deviceId: number);
+    public hasContact(contactName: string): boolean;
+  
+    public exportRegistrationObj(): any;
+    public serialize(): any;
+    public addSession(contact: any, contactBundle: any): Promise<boolean>;
+    public prepareMessage(contactName: string, message: string): Promise<string>;
+  
+    public encodeMessage(message: string): Promise<string>;
+  
+    public decodeMessage(message: string): Promise<any>;
+  
+    public decryptEncodedMessage(contactName: string, message: string): Promise<string>;
+  
+    private importPreKeyBundle(signalAddress: any, importedData: any): PreKeyBundleDef;
   }
 }

@@ -190,7 +190,11 @@ export namespace TypeDef {
 
 export declare class CoreDef {
   static importPreKeyRecord(serialized: any[]): TypeDef.PreKeyRecord;
+  static importSignedPreKeyRecord(serialized: any): TypeDef.SignedPreKeyRecord;
   static importSignedPreKey(serialized: any[]): TypeDef.SignedPreKeyRecord;
+  static importIdentityKey(serialized: any[]): TypeDef.IdentityKey;
+  static importPublicKey(serialized: any): TypeDef.ECPublicKey;
+  static createPreKeySignalMessage(serialized: any): TypeDef.PreKeySignalMessage;
   static createPreKeyRecord(id: number, keyPair: TypeDef.ECKeyPair): TypeDef.PreKeyRecord;
   static createSignedPreKeyRecord(id: number, timestamp: number, keyPair: TypeDef.ECKeyPair, signature: any): TypeDef.SignedPreKeyRecord;
   static createSignalProtocolStore(identityKeyPair: TypeDef.IdentityKeyPair, registrationId: number): MemorySignalProtocolStoreDef;
@@ -202,20 +206,29 @@ export declare class CoreDef {
   static createMemorySignalProtocolStore(identityKeyPair: TypeDef.IdentityKeyPair, registrationId: number): MemorySignalProtocolStoreDef;
   static createSessionRecord(): TypeDef.SessionRecord;
   static createSignalProtocolAddress(registrationId: number, deviceId: number): TypeDef.SignalProtocolAddress;
-  static createPreKeyBundle(registrationId: number, deviceId: number, preKeyId: number, preKeyPublic: TypeDef.ECPublicKey, signedPreKeyId: number, signedPreKeyPublic: TypeDef.ECPublicKey, signedPreKeySignature: any[], identityKey: TypeDef.IdentityKey): PreKeyBundleDef;
+  static createPreKeyBundle(registrationId: number, deviceId: number, preKeyId: number, preKeyPublic: TypeDef.ECPublicKey, signedPreKeyId: number, signedPreKeyPublic: TypeDef.ECPublicKey, signedPreKeySignature: any, identityKey: TypeDef.IdentityKey | any): PreKeyBundleDef;
+}
+
+export declare class CurveDef {
+  static generateKeyPair(): TypeDef.ECKeyPair;
+  static calculateSignature(signingKey: TypeDef.ECPrivateKey, message: any): any;
 }
 
 export declare class KeyHelperDef {
   static generateRegistrationId(extendedRange: boolean): number;
-  static generateIdentityKeyPair(): TypeDef.IdentityKeyPair;
+  static generateIdentityKeyPair(): any;
+  static generateIdentityKeyPairFormatted(): TypeDef.IdentityKeyPair;
   static importIdentityKeyPair(serialized: any): TypeDef.IdentityKeyPair;
   static importSignedPreKeyRecord(serialized: any): TypeDef.SignedPreKeyRecord;
   static importSignalProtocolAddress(name: any, deviceId: number): TypeDef.SignalProtocolAddress;
   static generatePreKeys(start: number, count: number): TypeDef.PreKeyRecord[];
+  static generatePreKeysFormatted(start: number, count: number): TypeDef.PreKeyRecord[];
   static generateSignedPreKey(identityKeyPair: TypeDef.IdentityKeyPair, signedPreKeyId: number, raw?: boolean): any;
+  static generateLastResortPreKey(): TypeDef.PreKeyRecord;
   static verifySignedPreKey(signingKey: TypeDef.ECPublicKey, message: any, signature: any): boolean;
   static generatePreKeys(start: number, count: number): TypeDef.PreKeyRecord[];
   static generateSignedPreKey(identityKeyPair: TypeDef.IdentityKeyPair, signedPreKeyId: number): TypeDef.SignedPreKeyRecord;
+  static generateSignedPreKeyFormatted(identityKeyPair: TypeDef.IdentityKeyPair, signedPreKeyId: number): any;
 }
 
 export declare class UtilDef {
@@ -227,7 +240,6 @@ export declare class UtilDef {
   static base64Decode(base64Str: any): number[];
   static toString(value: any): string;
   static isEqualString(value: any, compared: any): boolean;
-  static rawciphertextToBinary(value: any): any;
 }
 
 /**
@@ -323,18 +335,31 @@ export declare class PreKeyBundleDef {
   constructor(registrationId: number, deviceId: number, preKeyId: number, preKeyPublic: TypeDef.ECPublicKey, signedPreKeyId: number, signedPreKeyPublic: TypeDef.ECPublicKey, signedPreKeySignature: any[], identityKey: TypeDef.IdentityKey);
 }
 
-export declare class TestCoreDef {
-  BOB_ADDRESS: TypeDef.SignalProtocolAddress;
-  ALICE_ADDRESS: TypeDef.SignalProtocolAddress;
+export declare class ClientInfoDef {
+  constructor(identityKey: TypeDef.IdentityKey, registrationId: number, deviceId: number, preKeys: any[], signedPreKeyId: number, signedPreKey: TypeDef.ECPublicKey, signedPreKeySignature: any);
 
-  aliceSignedPreKey: TypeDef.ECKeyPair;
-  bobSignedPreKey: TypeDef.ECKeyPair;
+  public getPreKeyBundle(): any;
+}
 
-  aliceSignedPreKeyId: number;
-  bobSignedPreKeyId: number;
-  
-  constructor();
-  public testBasicSimultaneousInitiate(): void;
+export declare class ClientDef {
+  public store: ISignalProtocolStore;
+  public registrationId: number;
+  public username: string;
+  public deviceId: number;
+
+  constructor(clientName: string, registrationId: number, deviceId: number);
+  public hasContact(contactName: string): boolean;
+
+  public exportRegistrationObj(): any;
+  public serialize(): any;
+  public addSession(contact: any, contactBundle: any): Promise<boolean>;
+  public prepareMessage(contactName: string, message: string): Promise<string>;
+
+  public encodeMessage(message: string): Promise<string>;
+
+  public decodeMessage(message: string): Promise<any>;
+
+  public decryptEncodedMessage(contactName: string, message: string): Promise<string>;
 }
 
 /**
