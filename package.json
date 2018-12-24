@@ -1,0 +1,33 @@
+{
+  "name": "nativescript-libsignal-protocol",
+  "version": "0.1.0",
+  "description": "A Libsignal-Protocol wrapper for NativeScript.",
+  "main": "src/libsignal-protocol",
+  "typings": "src/index.d.ts",
+  "nativescript": {
+    "id": "org.nativescript.electrumx-client",
+    "platforms": {
+      "android": "5.0.0"
+    }
+  },
+  "keywords": [
+    "NativeScript",
+    "JavaScript",
+    "Android",
+    "Libsignal",
+    "Signal",
+    "LibsignalProtocol",
+    "Libsignal-Protocol",
+    "ODIN"
+  ],
+  "author": {
+    "name": "Pixxlated",
+    "url": "https://twitter.com/pixxlated"
+  },
+  "bugs": {
+    "url": "https://github.com/manbearpixel/nativescript-libsignal-protocol/issues"
+  },
+  "license": "GPL-3.0",
+  "homepage": "https://github.com/manbearpixel/nativescript-libsignal-protocol",
+  "readmeFilename": "README.md"
+}
