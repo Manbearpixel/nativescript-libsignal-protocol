@@ -27,8 +27,6 @@ import {
  * License: https://github.com/signalapp/libsignal-protocol-java/blob/master/LICENSE
  */
 
-declare var java: any;
-
 export namespace LibsignalProtocol {
 
   export namespace Type {
@@ -203,12 +201,12 @@ export namespace LibsignalProtocol {
     export class SessionRecord {
       ARCHIVED_STATES_MAX_LENGTH: number; //40
       sessionState: SessionState;
-      previousStates: java.util.LinkedList<SessionState>;
+      previousStates: any; //java.util.LinkedList<SessionState>;
       fresh: boolean;
   
       hasSessionState(version: number, aliceBaseKey: any[]): boolean;
       getSessionState(): SessionState;
-      getPreviousSessionStates(): java.util.List<SessionState>;
+      getPreviousSessionStates(): any; //java.util.List<SessionState>;
       removePreviousSessionStates(): void;
       isFresh(): boolean;
       archiveCurrentState(): void;
@@ -403,7 +401,7 @@ export namespace LibsignalProtocol {
     containsPreKey(preKeyId: number): boolean;
     removePreKey(preKeyId: number): void;
     loadSession(address: TypeDef.SignalProtocolAddress): TypeDef.SessionRecord;
-    getSubDeviceSessions(name: string): java.util.List<java.lang.Integer>;
+    getSubDeviceSessions(name: string): any; //java.util.List<java.lang.Integer>;
     storeSession(address: TypeDef.SignalProtocolAddress, record: TypeDef.SessionRecord): void;
     containsSession(address: TypeDef.SignalProtocolAddress): boolean;
     deleteSession(address: TypeDef.SignalProtocolAddress): void;
@@ -451,7 +449,7 @@ export namespace LibsignalProtocol {
 
   export class SessionStore implements SessionStoreDef {
     loadSession(address: TypeDef.SignalProtocolAddress): TypeDef.SessionRecord;
-    getSubDeviceSessions(name: string): java.util.List<java.lang.Integer>;
+    getSubDeviceSessions(name: string): any; //java.util.List<java.lang.Integer>;
     storeSession(address: TypeDef.SignalProtocolAddress, record: TypeDef.SessionRecord): void;
     containsSession(address: TypeDef.SignalProtocolAddress): boolean;
     deleteSession(address: TypeDef.SignalProtocolAddress): void;

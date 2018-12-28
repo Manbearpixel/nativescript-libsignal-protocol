@@ -1,3 +1,5 @@
+/// <reference path="node_modules/tns-platform-declarations/android.d.ts" />
+
 import {
   KeyHelperDef,
   UtilDef,
@@ -18,6 +20,7 @@ import {
   MemorySignalProtocolStoreDef } from './libsignal-protocol.common';
 
 declare var org: any;
+declare var java: any;
 
 export namespace LibsignalProtocol {
 
