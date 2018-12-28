@@ -775,6 +775,43 @@ export namespace LibsignalProtocol {
       return !!(this.contacts.hasOwnProperty(contactName));
     }
 
+    public generatePreKeyBatch(): any[] {
+      let preKeys = KeyHelper.generatePreKeysFormatted(this.random.nextInt(0xFFFFFF-101), 100);
+      let newPublicPreKeys = preKeys.map((_key) => {
+        return {
+          id: _key.keyId,
+          pubKey: _key.keyPair.pubKey
+        }
+      });
+
+      let newPrivatePreKeys = preKeys.map((_key) => {
+        return _key.serialized
+      });
+
+      this.publicPreKeys = this.publicPreKeys.concat(newPublicPreKeys);
+      this.privatePreKeys = this.privatePreKeys.concat(newPrivatePreKeys);
+
+      preKeys.forEach((_key) => {
+        let preKeyRecord = Core.importPreKeyRecord(Util.base64Decode(_key.serialized));
+        this.store.storePreKey(preKeyRecord.getId(), preKeyRecord);
+      });
+      return newPublicPreKeys;
+    }
+
+    public importPrivatePreKeys(privatePreKeys: any[]): void {
+      if (typeof privatePreKeys === 'undefined') {
+        console.log('No prekeys provided to import!');
+        return;
+      }
+
+      this.privatePreKeys = this.privatePreKeys.concat(privatePreKeys);
+
+      privatePreKeys.forEach((_key) => {
+        let preKeyRecord = Core.importPreKeyRecord(Util.base64Decode(_key));
+        this.store.storePreKey(preKeyRecord.getId(), preKeyRecord);
+      });
+    }
+
     public exportRegistrationObj() {
       return {
         address: {
@@ -799,14 +836,7 @@ export namespace LibsignalProtocol {
           username: this.username,
           deviceId: this.deviceId
         },
-        contacts: this.contacts.map((_c) => {
-          return {
-            registrationId: _c.registrationId,
-            deviceId: _c.deviceId,
-            preKeyBundle: _c.preKeyBundle,
-            sessionCipher: _c.sessionCipher
-          }
-        }),
+        contacts: this.contacts,
         preKeys: this.privatePreKeys,
         signedPreKey: Util.base64Encode(this.signedPreKey.serialize()),
         identityKeyPair: Util.base64Encode(this.store.getIdentityKeyPair().serialize())

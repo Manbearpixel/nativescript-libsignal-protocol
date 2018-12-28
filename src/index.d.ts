@@ -26,6 +26,9 @@ import {
  * Source:  https://github.com/signalapp/libsignal-protocol-java
  * License: https://github.com/signalapp/libsignal-protocol-java/blob/master/LICENSE
  */
+
+declare var java: any;
+
 export namespace LibsignalProtocol {
 
   export namespace Type {
@@ -241,7 +244,7 @@ export namespace LibsignalProtocol {
     static createSessionCipher(store: ISignalProtocolStore, address: TypeDef.SignalProtocolAddress): SessionCipherDef;
     static createMemorySignalProtocolStore(identityKeyPair: TypeDef.IdentityKeyPair, registrationId: number): InMemorySignalProtocolStoreDef;
     static createSessionRecord(): TypeDef.SessionRecord;
-    static createSignalProtocolAddress(registrationId: number, deviceId: number): TypeDef.SignalProtocolAddress;
+    static createSignalProtocolAddress(registrationId: number | string, deviceId: number): TypeDef.SignalProtocolAddress;
     static createCiphertextMessage(): TypeDef.CiphertextMessage;
     static createPreKeyBundle(registrationId: number, deviceId: number, preKeyId: number, preKeyPublic: TypeDef.ECPublicKey, signedPreKeyId: number, signedPreKeyPublic: TypeDef.ECPublicKey, signedPreKeySignature: any, identityKey: TypeDef.IdentityKey | any): PreKeyBundleDef;
   }
@@ -301,7 +304,7 @@ export namespace LibsignalProtocol {
      */
     static generatePreKeys(start: number, count: number): LibsignalProtocol.Type.PreKeyRecord[];
 
-    static generatePreKeysFormatted(start: number, count: number): TypeDef.PreKeyRecord[];
+    static generatePreKeysFormatted(start: number, count: number): any[];
   
     static generateSignedPreKey(identityKeyPair: LibsignalProtocol.Type.IdentityKeyPair, signedPreKeyId: number, raw?: boolean): any;
   
@@ -327,7 +330,7 @@ export namespace LibsignalProtocol {
      *
      * @return the generated last resort PreKeyRecord.
      */
-    static generateLastResortPreKey(): TypeDef.PreKeyRecord;
+    static generateLastResortPreKeyRecord(): TypeDef.PreKeyRecord;
 
     /**
      * Generate a signed PreKey
@@ -495,18 +498,15 @@ export namespace LibsignalProtocol {
   
     constructor(clientName: string, registrationId: number, deviceId: number);
     public hasContact(contactName: string): boolean;
-  
+    public generatePreKeyBatch(): any[];
+    public importPrivatePreKeys(privatePreKeys: any[]): void;
     public exportRegistrationObj(): any;
     public serialize(): any;
     public addSession(contact: any, contactBundle: any): Promise<boolean>;
     public prepareMessage(contactName: string, message: string): Promise<string>;
-  
     public encodeMessage(message: string): Promise<string>;
-  
     public decodeMessage(message: string): Promise<any>;
-  
     public decryptEncodedMessage(contactName: string, message: string): Promise<string>;
-  
     private importPreKeyBundle(signalAddress: any, importedData: any): PreKeyBundleDef;
   }
 }

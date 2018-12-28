@@ -1,3 +1,5 @@
+declare var java: any;
+
 export namespace TypeDef {
   export declare class CiphertextMessage {
     CURRENT_VERSION: number;
@@ -205,7 +207,7 @@ export declare class CoreDef {
   static createSessionCipher(store: ISignalProtocolStore, address: TypeDef.SignalProtocolAddress): SessionCipherDef;
   static createMemorySignalProtocolStore(identityKeyPair: TypeDef.IdentityKeyPair, registrationId: number): MemorySignalProtocolStoreDef;
   static createSessionRecord(): TypeDef.SessionRecord;
-  static createSignalProtocolAddress(registrationId: number, deviceId: number): TypeDef.SignalProtocolAddress;
+  static createSignalProtocolAddress(registrationId: number | string, deviceId: number): TypeDef.SignalProtocolAddress;
   static createPreKeyBundle(registrationId: number, deviceId: number, preKeyId: number, preKeyPublic: TypeDef.ECPublicKey, signedPreKeyId: number, signedPreKeyPublic: TypeDef.ECPublicKey, signedPreKeySignature: any, identityKey: TypeDef.IdentityKey | any): PreKeyBundleDef;
 }
 
@@ -222,9 +224,9 @@ export declare class KeyHelperDef {
   static importSignedPreKeyRecord(serialized: any): TypeDef.SignedPreKeyRecord;
   static importSignalProtocolAddress(name: any, deviceId: number): TypeDef.SignalProtocolAddress;
   static generatePreKeys(start: number, count: number): TypeDef.PreKeyRecord[];
-  static generatePreKeysFormatted(start: number, count: number): TypeDef.PreKeyRecord[];
+  static generatePreKeysFormatted(start: number, count: number): any[];
   static generateSignedPreKey(identityKeyPair: TypeDef.IdentityKeyPair, signedPreKeyId: number, raw?: boolean): any;
-  static generateLastResortPreKey(): TypeDef.PreKeyRecord;
+  static generateLastResortPreKeyRecord(): TypeDef.PreKeyRecord;
   static verifySignedPreKey(signingKey: TypeDef.ECPublicKey, message: any, signature: any): boolean;
   static generatePreKeys(start: number, count: number): TypeDef.PreKeyRecord[];
   static generateSignedPreKey(identityKeyPair: TypeDef.IdentityKeyPair, signedPreKeyId: number): TypeDef.SignedPreKeyRecord;
@@ -348,17 +350,16 @@ export declare class ClientDef {
   public deviceId: number;
 
   constructor(clientName: string, registrationId: number, deviceId: number);
-  public hasContact(contactName: string): boolean;
 
+  public hasContact(contactName: string): boolean;
+  public generatePreKeyBatch(): any[];
+  public importPrivatePreKeys(privatePreKeys: any[]): void;
   public exportRegistrationObj(): any;
   public serialize(): any;
   public addSession(contact: any, contactBundle: any): Promise<boolean>;
   public prepareMessage(contactName: string, message: string): Promise<string>;
-
   public encodeMessage(message: string): Promise<string>;
-
   public decodeMessage(message: string): Promise<any>;
-
   public decryptEncodedMessage(contactName: string, message: string): Promise<string>;
 }
 
