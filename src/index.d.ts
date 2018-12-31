@@ -230,6 +230,7 @@ export namespace LibsignalProtocol {
     static importSignedPreKeyRecord(serialized: any): TypeDef.SignedPreKeyRecord;
     static importSignedPreKey(serialized: any[]): TypeDef.SignedPreKeyRecord;
     static importIdentityKey(serialized: any[]): TypeDef.IdentityKey;
+    static importIdentityKeyPair(serialized: any): TypeDef.IdentityKeyPair;
     static importPublicKey(serialized: any): TypeDef.ECPublicKey;
     static createPreKeySignalMessage(serialized: any): TypeDef.PreKeySignalMessage;
     static createPreKeyRecord(id: number, keyPair: TypeDef.ECKeyPair): TypeDef.PreKeyRecord;
@@ -494,7 +495,8 @@ export namespace LibsignalProtocol {
     public username: string;
     public deviceId: number;
   
-    constructor(clientName: string, registrationId: number, deviceId: number);
+    constructor(clientName: string, registrationId: number, deviceId: number, identityKeyPairStr?: string, signedPreKeyStr?: string, importedPreKeys?: any[]);
+    
     public hasContact(contactName: string): boolean;
     public generatePreKeyBatch(): any[];
     public importPrivatePreKeys(privatePreKeys: any[]): void;
