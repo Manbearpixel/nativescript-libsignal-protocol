@@ -419,6 +419,16 @@ export namespace LibsignalProtocol {
       return null;
     }
 
+    static importIdentityKeyPair(serialized: any): TypeDef.IdentityKeyPair {
+      try {
+        return new org.whispersystems.libsignal.IdentityKeyPair(serialized);
+      } catch (err) {
+        console.log('ERROR -- Unable to import IdentityKeyPair');
+        console.log(err.message ? err.message : '...');
+      }
+      return null;
+    }
+
     static importPublicKey(serialized: any): TypeDef.ECPublicKey {
       try {
         return org.whispersystems.libsignal.ecc.Curve.decodePoint(serialized, 0);
@@ -721,57 +731,85 @@ export namespace LibsignalProtocol {
     private privatePreKeys: any[];
     private signedPreKey: any;
     private contacts: any;
+    private identityKeyPair: TypeDef.IdentityKeyPair;
 
     public registrationId: number;
     public username: string;
     public deviceId: number;
 
-    constructor(clientName: string, registrationId: number, deviceId: number) {
+    constructor(clientName: string, registrationId: number, deviceId: number, identityKeyPairStr?: string, signedPreKeyStr?: string, importedPreKeys?: any[]) {
       this.random = new java.util.Random();
       this.contacts = {};
       this.username = clientName;
       this.deviceId = deviceId;
       this.registrationId = registrationId;
+      this.publicPreKeys  = [];
+      this.privatePreKeys = [];
+      this.identityKeyPair;
+      this.signedPreKey;
 
-      // console.log(`>> Starting Client [${clientName}] ID:[${registrationId} Device:[${deviceId}]`);
+      // create a signal protocol address identifier
       this.address = Core.createSignalProtocolAddress(clientName, deviceId);
 
-      // Generate some keys for usage
-      let identityKeyPair = LibsignalProtocol.KeyHelper.generateIdentityKeyPair();
-      // console.log(`>> Client Identity Public [${Util.base64Encode(identityKeyPair.getPublicKey().serialize())}]`);
+      // generate or import an identity key pair
+      if (typeof identityKeyPairStr === 'undefined') {
+        this. identityKeyPair = KeyHelper.generateIdentityKeyPair();
+      } else {
+        this.identityKeyPair = Core.importIdentityKeyPair(Util.base64Decode(identityKeyPairStr));
+      }
 
-      // Generate initial prekeys for client session
-      let preKeys = KeyHelper.generatePreKeysFormatted(this.random.nextInt(0xFFFFFF-101), 100);
-      let lastResortPreKeyRecord = KeyHelper.generateLastResortPreKeyRecord();
-      this.signedPreKey = KeyHelper.generateSignedPreKey(identityKeyPair, this.random.nextInt(0xFFFFFF-1));
-      // console.log(`>> Client Identity Generated 101 preKeys, 1 signedPreKey`);
+      // generate or import a signed prekey record
+      if (typeof signedPreKeyStr === 'undefined') {
+        this.signedPreKey = KeyHelper.generateSignedPreKey(this.identityKeyPair, this.random.nextInt(0xFFFFFF-1));
+      } else {
+        this.signedPreKey = Core.importSignedPreKeyRecord(Util.base64Decode(signedPreKeyStr));
+      }
+      
+      // create the in-memory storage for signal session
+      this.store = Core.createMemorySignalProtocolStore(this.identityKeyPair, registrationId);
 
-      this.publicPreKeys = preKeys.map((_key) => {
-        return {
-          id: _key.keyId,
-          pubKey: _key.keyPair.pubKey
-        }
-      });
-
-      this.privatePreKeys = preKeys.map((_key) => {
-        return _key.serialized
-      });
-
-      this.store = Core.createMemorySignalProtocolStore(identityKeyPair, registrationId);
-      // console.log(`>> Client Store created`);
-
+      // store the signed prekey record
       this.store.storeSignedPreKey(this.signedPreKey.getId(), this.signedPreKey);
-      // console.log(`>> Client Added 1 SignedPreKey to Store`);
 
-      preKeys.forEach((_key) => {
-        let preKeyRecord = Core.importPreKeyRecord(Util.base64Decode(_key.serialized));
-        // console.log(`...storing #${preKeyRecord.getId()}`);
-        this.store.storePreKey(preKeyRecord.getId(), preKeyRecord);
-      });
-      // console.log(`>> Client Added PreKeys to Store`);
+      // generate or import an array of unsigned prekey records
+      // - adds them to private array of prekey records (for export)
+      // - adds them to private array of prekey serialized records (for storage/import)
+      // - adds them to in-memory storage
+      if (typeof importedPreKeys === 'undefined') {
+        let preKeys = KeyHelper.generatePreKeysFormatted(this.random.nextInt(0xFFFFFF-101), 100);
 
+        preKeys.forEach((preKeyFormatted) => {
+          this.publicPreKeys.push({
+            id: preKeyFormatted.keyId,
+            pubKey: preKeyFormatted.keyPair.pubKey
+          });
+
+          this.privatePreKeys.push(preKeyFormatted.serialized);
+
+          let preKeyRecord = Core.importPreKeyRecord(Util.base64Decode(preKeyFormatted.serialized));
+          this.store.storePreKey(preKeyRecord.getId(), preKeyRecord);
+        });
+      } else {
+        importedPreKeys.forEach((serializedKey) => {
+          console.log(`importing...${serializedKey}`);
+
+          let preKeyRecord = Core.importPreKeyRecord(Util.base64Decode(serializedKey));
+          let keyPair: TypeDef.ECKeyPair = preKeyRecord.getKeyPair();
+
+          this.publicPreKeys.push({
+            id: preKeyRecord.getId(),
+            pubKey: Util.base64Encode(keyPair.getPublicKey().serialize())
+          });
+
+          this.privatePreKeys = importedPreKeys;
+
+          this.store.storePreKey(preKeyRecord.getId(), preKeyRecord);
+        });
+      }
+
+      // generate a "last resort" prekey record
+      let lastResortPreKeyRecord = KeyHelper.generateLastResortPreKeyRecord();
       this.store.storePreKey(lastResortPreKeyRecord.getId(), lastResortPreKeyRecord);
-      // console.log(`>> Client Added LastResort PreKey to Store`);
     }
 
     public hasContact(contactName: string) {
