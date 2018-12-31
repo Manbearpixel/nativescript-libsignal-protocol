@@ -5,7 +5,7 @@
   "main": "src/libsignal-protocol",
   "typings": "src/index.d.ts",
   "nativescript": {
-    "id": "org.nativescript.electrumx-client",
+    "id": "org.nativescript.libsignal-protocol",
     "platforms": {
       "android": "5.0.0"
     }
