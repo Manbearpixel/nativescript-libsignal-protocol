@@ -104,6 +104,9 @@ export class HelloWorldModel extends Observable {
 
     // Uncomment to demonstrate a simple client interface!
     // this.demo_ClientSessionInit();
+
+    // Uncomment to demonstrate another client interface!
+    // this.demo_ClientConversationInit();
   }
 
   get sesh(): any {
@@ -282,20 +285,25 @@ export class HelloWorldModel extends Observable {
     return sessionIdentity;
   }
 
+  /**
+   * This demo runs through a series of messages between ALICE and BOB
+   * in a direct conversation manner. There are three tests which run 5 messages
+   * back and forth between two clients.
+   */
   public async demo_ClientSessionInit() {
     console.log('===- DEMO -- ClientSession -===');
     
     let aliceClient     = new LibsignalProtocol.Client('userAlice', 2222, 123);
     let aliceClientReg  = aliceClient.exportRegistrationObj();
 
-    let bobClient     = new LibsignalProtocol.Client('userBob', 1111, 123);
+    let bobClient     =  new LibsignalProtocol.Client('userBob', 1111, 123);
     let bobClientReg  = bobClient.exportRegistrationObj();
 
     let aliceClientInfo = new LibsignalProtocol.ClientInfo(
       aliceClientReg.identityPubKey,
       aliceClientReg.address.registrationId,
       aliceClientReg.address.deviceId,
-      aliceClientReg.publicPreKeys,
+      aliceClientReg.preKeys,
       aliceClientReg.signedPreKey.id,
       aliceClientReg.signedPreKey.pubKey,
       aliceClientReg.signedPreKey.signature
@@ -305,7 +313,7 @@ export class HelloWorldModel extends Observable {
       bobClientReg.identityPubKey,
       bobClientReg.address.registrationId,
       bobClientReg.address.deviceId,
-      bobClientReg.publicPreKeys,
+      bobClientReg.preKeys,
       bobClientReg.signedPreKey.id,
       bobClientReg.signedPreKey.pubKey,
       bobClientReg.signedPreKey.signature
@@ -320,11 +328,31 @@ export class HelloWorldModel extends Observable {
     await bobClient.addSession(aliceClientReg.address, alicePreKeyBundle);
     console.log('...BOB ADDED ALICE SESSION');
 
+    console.log('sanity checks...', {
+      bob2alice_contact: bobClient.hasContact(aliceClientReg.address.name),
+      bob2alice_session: bobClient.hasSession(aliceClientReg.address.name),
+      alice2bob_contact: aliceClient.hasContact(bobClientReg.address.name),
+      alice2bob_session:  aliceClient.hasSession(bobClientReg.address.name)
+    });
 
-    console.log('BOB_PREKEY_BUNDLE', bobPreKeyBundle);
+    // let bobCipher = aliceClient.getContact('userBob');
+    // console.dir(bobCipher);
+    // let bobSessionRecord = aliceClient.getSessionRecord('userBob');
+    // console.log('fresh?', bobSessionRecord.isFresh());
+    // console.log('serial?', LibsignalProtocol.Util.base64Encode(bobSessionRecord.serialize()));
+    
 
-    console.log('Test...bob has alice?', bobClient.hasContact(aliceClientReg.address.name));
-    console.log('Test...alice has bob?', aliceClient.hasContact(bobClientReg.address.name));
+    if (!bobClient.hasContact(aliceClientReg.address.name) ||
+        !aliceClient.hasContact(bobClientReg.address.name)) {
+      console.log("Unable to continue... clients are missing eachother's contact details...");
+      throw new Error('Something went wrong while adding demo sessions...');
+    }
+
+    if (!bobClient.hasSession(aliceClientReg.address.name) ||
+        !aliceClient.hasSession(bobClientReg.address.name)) {
+      console.log("Unable to continue... clients are missing eachother's sessions...");
+      throw new Error('Something went wrong while adding demo sessions...');
+    }
 
     let bobToAliceTests = [
       'pixxlated',
@@ -334,7 +362,8 @@ export class HelloWorldModel extends Observable {
       'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut quis ornare velit. Nulla venenatis porta dolor sodales efficitur. Sed ipsum tellus, efficitur ut aliquam sollicitudin, dictum id dui. Aliquam efficitur elit ut mi vehicula, sed cursus elit suscipit. Vestibulum quis ligula in est iaculis consectetur a id urna. Phasellus semper in libero non laoreet. Quisque nec tempor tellus. Nullam non nunc magna. Nullam fringilla, libero non euismod semper, est mauris facilisis erat, quis auctor diam dolor sit amet augue. Mauris interdum interdum leo, et pulvinar felis vulputate eget.'
     ];
 
-    console.log(`Running ${bobToAliceTests.length} BOB >> ALICE Message Tests...`);
+    console.log(`~~~ [TEST] ~~~`);
+    console.log(`>>> Running ${bobToAliceTests.length} BOB >> ALICE Message Tests...`);
     try {
       for (let i=0; i < bobToAliceTests.length; i++) {
         let testMessage = bobToAliceTests[i];
@@ -344,18 +373,181 @@ export class HelloWorldModel extends Observable {
           console.log({
             test: (i + 1),
             success: (plainTextMessage === testMessage),
-            encoded: encodedMessage
+            encoded: encodedMessage.substr(0, 20) + '...'
           });
         } catch (err) {
-          console.log('unable to decrypt message');
+          console.log('BOB >> ALICE ...unable to decrypt message');
           console.log(err);
         }
       }
 
-      console.log('...Test complete!');
+      console.log('...BOB >> ALICE ...Test complete!');
+      console.log('---\n---');
     } catch (err) {
+      console.log('...ALICE >> BOB ... FAILED');
       console.log(err);
     }
+
+    console.log(`~~~ [TEST] ~~~`);
+    console.log(`>>> Running ${bobToAliceTests.length} ALICE >> BOB Message Tests...`);
+    try {
+      for (let i=0; i < bobToAliceTests.length; i++) {
+        let testMessage = bobToAliceTests[i];
+        try {
+          let encodedMessage = await aliceClient.prepareMessage('userBob', testMessage).then(aliceClient.encodeMessage);
+          let plainTextMessage = await bobClient.decryptEncodedMessage('userAlice', encodedMessage);
+          console.log({
+            test: (i + 1),
+            success: (plainTextMessage === testMessage),
+            encoded: encodedMessage.substr(0, 20) + '...'
+          });
+        } catch (err) {
+          console.log('ALICE >> BOB ...unable to decrypt message');
+          console.log(err);
+        }
+      }
+
+      console.log('...ALICE >> BOB ...Test complete!');
+      console.log('---\n---');
+    } catch (err) {
+      console.log('...ALICE >> BOB ... FAILED');
+      console.log(err);
+    }
+
+    console.log(`~~~ [TEST] ~~~`);
+    console.log(`>>> Running ${bobToAliceTests.length} BOB >> ALICE Message Tests...`);
+    try {
+      for (let i=0; i < bobToAliceTests.length; i++) {
+        let testMessage = bobToAliceTests[i];
+        try {
+          let encodedMessage = await bobClient.prepareMessage('userAlice', testMessage).then(aliceClient.encodeMessage);
+          let plainTextMessage = await aliceClient.decryptEncodedMessage('userBob', encodedMessage);
+          console.log({
+            test: (i + 1),
+            success: (plainTextMessage === testMessage),
+            encoded: encodedMessage.substr(0, 20) + '...'
+          });
+        } catch (err) {
+          console.log('BOB >> ALICE ...unable to decrypt message');
+          console.log(err);
+        }
+      }
+
+      console.log('...BOB >> ALICE ...Test complete!');
+      console.log('---\n---');
+    } catch (err) {
+      console.log('...ALICE >> BOB ... FAILED');
+      console.log(err);
+    }
+
+  }
+
+  /**
+   * This demo runs through another conversation between ALICE and BOB but
+   * provides an example of exporting a client (ALICE) and recreating the
+   * ALICE client to continue the conversation
+   */
+  public async demo_ClientConversationInit() {
+    console.log('===- DEMO -- ClientConversation -===');
+
+    /**
+     * Generate Alice and Bob clients
+     */
+    let aliceClient     = new LibsignalProtocol.Client('userAlice', 2222, 123);
+    let aliceClientReg  = aliceClient.exportRegistrationObj();
+
+    let bobClient       =  new LibsignalProtocol.Client('userBob', 1111, 123);
+    let bobClientReg    = bobClient.exportRegistrationObj();
+
+    /**
+     * Generate Alice and Bob bundle stores (ClientInfo)
+     */
+    let aliceClientInfo = new LibsignalProtocol.ClientInfo(
+      aliceClientReg.identityPubKey, aliceClientReg.address.registrationId,
+      aliceClientReg.address.deviceId, aliceClientReg.preKeys,
+      aliceClientReg.signedPreKey.id, aliceClientReg.signedPreKey.pubKey,
+      aliceClientReg.signedPreKey.signature
+    );
+
+    let bobClientInfo = new LibsignalProtocol.ClientInfo(
+      bobClientReg.identityPubKey, bobClientReg.address.registrationId,
+      bobClientReg.address.deviceId, bobClientReg.preKeys,
+      bobClientReg.signedPreKey.id, bobClientReg.signedPreKey.pubKey,
+      bobClientReg.signedPreKey.signature
+    );
+    
+    /**
+     * Test #1
+     * 
+     * Initial Alice to Bob message
+     */
+    let testMsg1 = 'HELLO BOB FROM ALICE 1';
+
+    // Alice adds bob bundle
+    let bobBundle1 = bobClientInfo.getPreKeyBundle();
+    await aliceClient.addSession(bobClientReg.address, bobBundle1);
+
+    // Alice sends message to Bob
+    let encodedMessage1 = await aliceClient.prepareMessage(bobClientReg.address.name, testMsg1)
+    .then(aliceClient.encodeMessage);
+
+    // Bob sees message from Alice... Pulls bundle for Alice with no previous pull...
+    let aliceBundle1 = aliceClientInfo.getPreKeyBundle();
+    await bobClient.addSession(aliceClientReg.address, aliceBundle1);
+
+    // Bob decrypts message
+    try {
+      let plainTextMessage1 = await bobClient.decryptEncodedMessage(aliceClientReg.address.name, encodedMessage1);
+    
+      console.log('Alice >> Bob', {
+        before: testMsg1,
+        after: encodedMessage1,
+        success: (testMsg1 === plainTextMessage1)
+      });
+    } catch (err) {
+      console.log('Unable to decrypt ALICE >> BOB');
+      console.log(err.message ? err.message : err);
+    }
+
+    
+
+    
+    /**
+     * Test #2
+     * 
+     * Alice has gone offline and is a new session,
+     * Bob has sent a message
+     * Alice is decrypting the message
+     */
+    let testMsg2 = 'HELLO ALICE FROM BOB 1';
+
+    // Bob posts a message
+    await bobClient.addSession(aliceClientReg.address, aliceClientInfo.getPreKeyBundle());
+    let encodedMessage2 = await bobClient.prepareMessage(aliceClientReg.address.name, testMsg2).then(bobClient.encodeMessage);
+
+    // Alice Client imported from saved state
+    let importedAliceClient = JSON.parse(JSON.stringify(aliceClient));
+
+    let newAliceClient = new LibsignalProtocol.Client(importedAliceClient.username, importedAliceClient.registrationId, importedAliceClient.deviceId, importedAliceClient.identityKeyPair, importedAliceClient.signedPreKey, importedAliceClient.preKeys);
+
+    // Alice sees a message from Bob, pulls a bob bundle...
+    await newAliceClient.addSession(bobClientReg.address, bobClientInfo.getPreKeyBundle());
+
+    // Alice decrypts message
+    try {
+      let plainTextMessage2 = await newAliceClient.decryptEncodedMessage(bobClientReg.address.name, encodedMessage2);
+    
+      console.log('Bob >> NewAlice', {
+        before: testMsg2,
+        after: encodedMessage2,
+        success: (testMsg2 === plainTextMessage2)
+      });
+    } catch (err) {
+      console.log('Unable to decrypt BOB >> ALICE');
+      console.log(err.message ? err.message : err);
+    }
+
+    return true;
   }
 
   private async pushSessionToServer() {
