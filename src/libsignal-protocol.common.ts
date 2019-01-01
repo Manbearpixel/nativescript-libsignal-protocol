@@ -346,22 +346,29 @@ export declare class ClientInfoDef {
 
 export declare class ClientDef {
   public store: ISignalProtocolStore;
-  public registrationId: number;
-  public username: string;
-  public deviceId: number;
-
-  constructor(clientName: string, registrationId: number, deviceId: number, identityKeyPairStr?: string, signedPreKeyStr?: string, importedPreKeys?: any[]);
-
-  public hasContact(contactName: string): boolean;
-  public generatePreKeyBatch(): any[];
-  public importPrivatePreKeys(privatePreKeys: any[]): void;
-  public exportRegistrationObj(): any;
-  public serialize(): any;
-  public addSession(contact: any, contactBundle: any): Promise<boolean>;
-  public prepareMessage(contactName: string, message: string): Promise<string>;
-  public encodeMessage(message: string): Promise<string>;
-  public decodeMessage(message: string): Promise<any>;
-  public decryptEncodedMessage(contactName: string, message: string): Promise<string>;
+    public registrationId: number;
+    public username: string;
+    public deviceId: number;
+  
+    constructor(clientName: string, registrationId: number, deviceId: number, identityKeyPairStr?: string, signedPreKeyStr?: string, importedPreKeys?: any[], contacts?: any[]);
+    
+    public hasContact(contactName: string): boolean;
+    public getContact(contactName: string): any;
+    public getContactIndex(contactName: string): any;
+    public getSessionRecord(contactName: string): any;
+    public hasSession(contactName: string): boolean;
+    public hasPreKey(preKeyId: number): boolean;
+    public hasSignedPreKey(signedPreKeyId: number): boolean;
+    public generatePreKeyBatch(startFrom?: number): any[];
+    public importPreKeys(preKeys: any[]): Promise<boolean>;
+    public exportRegistrationObj(): any;
+    public toJSON(): any;
+    public serialize(): any;
+    public addSession(contact: any, contactBundle: any): Promise<boolean>;
+    public prepareMessage(contactName: string, message: string): Promise<string>;
+    public encodeMessage(message: string): Promise<string>;
+    public decodeMessage(message: string): Promise<any>;
+    public decryptEncodedMessage(contactName: string, message: string): Promise<string>;
 }
 
 /**

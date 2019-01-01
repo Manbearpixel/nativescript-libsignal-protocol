@@ -444,7 +444,7 @@ export namespace LibsignalProtocol {
         return new org.whispersystems.libsignal.protocol.PreKeySignalMessage(serialized);
       } catch (err) {
         console.log('ERROR -- Unable to create PreKeySignalMessage');
-        console.log(err.message ? err.message : '...');
+        // console.log(err.message ? err.message : '...');
       }
       return null;
     }
@@ -727,130 +727,136 @@ export namespace LibsignalProtocol {
     private address: TypeDef.SignalProtocolAddress;
     public store: ISignalProtocolStore;
     
-    private publicPreKeys: any[];
-    private privatePreKeys: any[];
+    private preKeys: any[];
     private signedPreKey: any;
-    private contacts: any;
+    private contacts: any[];
     private identityKeyPair: TypeDef.IdentityKeyPair;
 
     public registrationId: number;
     public username: string;
     public deviceId: number;
-
-    constructor(clientName: string, registrationId: number, deviceId: number, identityKeyPairStr?: string, signedPreKeyStr?: string, importedPreKeys?: any[]) {
-      this.random = new java.util.Random();
-      this.contacts = {};
-      this.username = clientName;
-      this.deviceId = deviceId;
+    
+    constructor(clientName: string, registrationId: number, deviceId: number, identityKeyPairStr?: string, signedPreKeyStr?: string, importedPreKeys?: any[], contacts?: any[]) {
+      
+      this.username       = clientName;
+      this.deviceId       = deviceId;
       this.registrationId = registrationId;
-      this.publicPreKeys  = [];
-      this.privatePreKeys = [];
+
+      this.random   = new java.util.Random();
+      this.contacts = [];
+      this.preKeys  = [];
       this.identityKeyPair;
       this.signedPreKey;
 
-      // create a signal protocol address identifier
-      this.address = Core.createSignalProtocolAddress(clientName, deviceId);
+      this.createAddress();
+      this.createIdentityKeyPair(identityKeyPairStr);
+      this.createSignedPreKey(signedPreKeyStr);
 
-      // generate or import an identity key pair
-      if (typeof identityKeyPairStr === 'undefined') {
-        this. identityKeyPair = KeyHelper.generateIdentityKeyPair();
-      } else {
-        this.identityKeyPair = Core.importIdentityKeyPair(Util.base64Decode(identityKeyPairStr));
-      }
-
-      // generate or import a signed prekey record
-      if (typeof signedPreKeyStr === 'undefined') {
-        this.signedPreKey = KeyHelper.generateSignedPreKey(this.identityKeyPair, this.random.nextInt(0xFFFFFF-1));
-      } else {
-        this.signedPreKey = Core.importSignedPreKeyRecord(Util.base64Decode(signedPreKeyStr));
-      }
-      
       // create the in-memory storage for signal session
-      this.store = Core.createMemorySignalProtocolStore(this.identityKeyPair, registrationId);
+      this.store = Core.createMemorySignalProtocolStore(this.identityKeyPair, this.registrationId);
 
       // store the signed prekey record
       this.store.storeSignedPreKey(this.signedPreKey.getId(), this.signedPreKey);
 
-      // generate or import an array of unsigned prekey records
-      // - adds them to private array of prekey records (for export)
-      // - adds them to private array of prekey serialized records (for storage/import)
-      // - adds them to in-memory storage
-      if (typeof importedPreKeys === 'undefined') {
-        let preKeys = KeyHelper.generatePreKeysFormatted(this.random.nextInt(0xFFFFFF-101), 100);
-
-        preKeys.forEach((preKeyFormatted) => {
-          this.publicPreKeys.push({
-            id: preKeyFormatted.keyId,
-            pubKey: preKeyFormatted.keyPair.pubKey
-          });
-
-          this.privatePreKeys.push(preKeyFormatted.serialized);
-
-          let preKeyRecord = Core.importPreKeyRecord(Util.base64Decode(preKeyFormatted.serialized));
-          this.store.storePreKey(preKeyRecord.getId(), preKeyRecord);
-        });
-      } else {
-        importedPreKeys.forEach((serializedKey) => {
-          console.log(`importing...${serializedKey}`);
-
-          let preKeyRecord = Core.importPreKeyRecord(Util.base64Decode(serializedKey));
-          let keyPair: TypeDef.ECKeyPair = preKeyRecord.getKeyPair();
-
-          this.publicPreKeys.push({
-            id: preKeyRecord.getId(),
-            pubKey: Util.base64Encode(keyPair.getPublicKey().serialize())
-          });
-
-          this.privatePreKeys = importedPreKeys;
-
-          this.store.storePreKey(preKeyRecord.getId(), preKeyRecord);
-        });
-      }
-
       // generate a "last resort" prekey record
       let lastResortPreKeyRecord = KeyHelper.generateLastResortPreKeyRecord();
       this.store.storePreKey(lastResortPreKeyRecord.getId(), lastResortPreKeyRecord);
+
+      this.createPreKeys(importedPreKeys);
+      this.createContacts(contacts);
     }
 
-    public hasContact(contactName: string) {
-      return !!(this.contacts.hasOwnProperty(contactName));
+    public hasContact(contactName: string): boolean {
+      let contactIndex = this.contacts.findIndex((contact) => {
+        return !!(contact.name === contactName);
+      });
+
+      return !!(contactIndex >= 0);
     }
 
-    public generatePreKeyBatch(): any[] {
-      let preKeys = KeyHelper.generatePreKeysFormatted(this.random.nextInt(0xFFFFFF-101), 100);
-      let newPublicPreKeys = preKeys.map((_key) => {
-        return {
-          id: _key.keyId,
-          pubKey: _key.keyPair.pubKey
+    public getContact(contactName: string): any {
+      return this.contacts.find((contact) => {
+        return !!(contact.name === contactName);
+      });
+    }
+
+    public getContactIndex(contactName: string): any {
+      return this.contacts.findIndex((contact) => {
+        return !!(contact.name === contactName);
+      });
+    }
+
+    public getSessionRecord(contactName: string): any {
+      if (!this.hasContact(contactName)) return false;
+      
+      let contact = this.getContact(contactName);
+      return this.store.loadSession(contact.signalAddress);
+    }
+
+    public hasSession(contactName: string): boolean {
+      if (!this.hasContact(contactName)) return false;
+      
+      let contact = this.getContact(contactName);
+      return !!(this.store.containsSession(contact.signalAddress));
+    }
+
+    public hasPreKey(preKeyId: number): boolean {
+      return !!(this.store.containsPreKey(preKeyId));
+    }
+
+    public hasSignedPreKey(signedPreKeyId: number): boolean {
+      return !!(this.store.containsSignedPreKey(signedPreKeyId));
+    }
+
+    public generatePreKeyBatch(startFrom?: number): any[] {
+      if (typeof startFrom === 'undefined') startFrom = this.random.nextInt(0xFFFFFF-101);
+      
+      let preKeys = KeyHelper.generatePreKeysFormatted(startFrom, 100);
+      preKeys.forEach((preKey) => {
+        try {
+          this.preKeys.push({
+            id: preKey.keyId,
+            pubKey: preKey.keyPair.pubKey,
+            serialized: preKey.serialized
+          });
+
+          let preKeyRecord = Core.importPreKeyRecord(Util.base64Decode(preKey.serialized));
+          this.store.storePreKey(preKeyRecord.getId(), preKeyRecord);
+        } catch (err) {
+          console.log('Unable to import prekey batch');
+          console.log(err);
         }
       });
 
-      let newPrivatePreKeys = preKeys.map((_key) => {
-        return _key.serialized
+      return preKeys.map((preKey) => {
+        return {
+          id: preKey.keyId,
+          pubKey: preKey.keyPair.pubKey,
+          serialized: preKey.serialized
+        }
       });
-
-      this.publicPreKeys = this.publicPreKeys.concat(newPublicPreKeys);
-      this.privatePreKeys = this.privatePreKeys.concat(newPrivatePreKeys);
-
-      preKeys.forEach((_key) => {
-        let preKeyRecord = Core.importPreKeyRecord(Util.base64Decode(_key.serialized));
-        this.store.storePreKey(preKeyRecord.getId(), preKeyRecord);
-      });
-      return newPublicPreKeys;
     }
 
-    public importPrivatePreKeys(privatePreKeys: any[]): void {
-      if (typeof privatePreKeys === 'undefined') {
+    public async importPreKeys(preKeys: any[]): Promise<boolean> {
+      if (typeof preKeys === 'undefined') {
         console.log('No prekeys provided to import!');
-        return;
+        return false;
       }
 
-      this.privatePreKeys = this.privatePreKeys.concat(privatePreKeys);
+      preKeys.forEach((_key) => {
+        let preKeyRecord: TypeDef.PreKeyRecord = Core.importPreKeyRecord(Util.base64Decode(_key.serialized));
+        let keyPair: TypeDef.ECKeyPair = preKeyRecord.getKeyPair();
 
-      privatePreKeys.forEach((_key) => {
-        let preKeyRecord = Core.importPreKeyRecord(Util.base64Decode(_key));
+        this.preKeys.push({
+          id: preKeyRecord.getId(),
+          pubKey: Util.base64Encode(keyPair.getPublicKey().serialize()),
+          serialized: Util.base64Encode(preKeyRecord.serialize())
+        });
+
         this.store.storePreKey(preKeyRecord.getId(), preKeyRecord);
       });
+
+      return true;
     }
 
     public exportRegistrationObj() {
@@ -866,24 +872,13 @@ export namespace LibsignalProtocol {
           pubKey: Util.base64Encode(this.signedPreKey.getKeyPair().getPublicKey().serialize()),
           signature: Util.base64Encode(this.signedPreKey.getSignature())
         },
-        publicPreKeys: this.publicPreKeys,
+        preKeys: this.preKeys.map((key) => {
+          return {
+            id: key.id,
+            pubKey: key.pubKey
+          }
+        })
       }
-    }
-
-    public serialize() {
-      let serialize = {
-        client: {
-          registrationId: this.registrationId,
-          username: this.username,
-          deviceId: this.deviceId
-        },
-        contacts: this.contacts,
-        preKeys: this.privatePreKeys,
-        signedPreKey: Util.base64Encode(this.signedPreKey.serialize()),
-        identityKeyPair: Util.base64Encode(this.store.getIdentityKeyPair().serialize())
-      };
-
-      return JSON.stringify(serialize);
     }
 
     public addSession(contact: any, contactBundle: any): Promise<boolean> {
@@ -900,19 +895,29 @@ export namespace LibsignalProtocol {
         let sessionBuilder = Core.createSessionBuilder(this.store, signalAddress);
 
         // import the PreKeyBundle into the SessionBuilder
+        // ...store.identityKeyStore.saveIdentity(remoteAddress, preKey.getIdentityKey());
+        // ...store.sessionStore.storeSession(remoteAddress, sessionRecord);
         sessionBuilder.process(preKeyBundle);
 
         // create SessionCipher
         let sessionCipher = Core.createSessionCipher(this.store, signalAddress);
 
-        this.contacts[contact.name] = {
-          registrationId: contact.registrationId,
-          deviceId: contact.deviceId,
-          preKeyBundle: contactBundle,
-          sessionCipher: sessionCipher,
-          signalAddress: signalAddress
-        };
-        
+        if (this.hasContact(contact.name)) {
+          console.log('updating contact');
+          let nContact = this.getContactIndex(contact.name);
+          this.contacts[nContact].sessionCipher = sessionCipher;
+        } else {
+          console.log('creating contact');
+          this.contacts.push({
+            name: contact.name,
+            registrationId: contact.registrationId,
+            deviceId: contact.deviceId,
+            preKeyBundle: contactBundle,
+            sessionCipher: sessionCipher,
+            signalAddress: signalAddress
+          });
+        }
+
         return Promise.resolve(true);
       } catch(err) {
         console.log(`Unable to add session for [${contact.name}]`);
@@ -926,7 +931,7 @@ export namespace LibsignalProtocol {
         throw new Error('missing_contact');
       }
 
-      let cipher = this.contacts[contactName].sessionCipher;
+      let cipher = this.getContact(contactName).sessionCipher;
       return Promise.resolve(this.encryptMessage(message, cipher));
     }
 
@@ -944,8 +949,58 @@ export namespace LibsignalProtocol {
       }
 
       let decodedMessage = await this.decodeMessage(message);
-      let cipher = this.contacts[contactName].sessionCipher;
+      let cipher = this.getContact(contactName).sessionCipher;
       return Promise.resolve(this.decryptMessage(decodedMessage, cipher));
+    }
+
+    public toJSON(): any {
+      return {
+        username: this.username,
+        deviceId: this.deviceId,
+        registrationId: this.registrationId,
+        address: {
+          name: this.registrationId,
+          deviceId: this.deviceId
+        },
+        identityKeyPair: Util.base64Encode(this.store.getIdentityKeyPair().serialize()),
+        signedPreKey: Util.base64Encode(this.signedPreKey.serialize()),
+        contacts: this.contacts.map((c) => {
+          return {
+            "address": {
+              "name": c.name,
+              "registrationId": c.registrationId,
+              "deviceId": c.deviceId,
+            },
+            "preKeyBundle": {
+              "registrationId": c.preKeyBundle.registrationId,
+              "deviceId": c.preKeyBundle.deviceId,
+              "preKeyPublic": c.preKeyBundle.preKeyPublic,
+              "preKeyRecordId": c.preKeyBundle.preKeyRecordId,
+              "signedPreKeyPublic": c.preKeyBundle.signedPreKeyPublic,
+              "signedPreKeyRecordId": c.preKeyBundle.signedPreKeyRecordId,
+              "signature": c.preKeyBundle.signature,
+              "identityPubKey": c.preKeyBundle.identityPubKey
+            }
+          };
+        }),
+        preKeys: this.preKeys
+      }
+    }
+
+    public serialize(): any {
+      let serialize = {
+        client: {
+          registrationId: this.registrationId,
+          username: this.username,
+          deviceId: this.deviceId
+        },
+        contacts: this.contacts,
+        signedPreKey: Util.base64Encode(this.signedPreKey.serialize()),
+        identityKeyPair: Util.base64Encode(this.store.getIdentityKeyPair().serialize()),
+        preKeys: this.preKeys
+      };
+
+      return JSON.stringify(serialize);
     }
 
     private importPreKeyBundle(signalAddress: any, importedData: any): PreKeyBundleDef {
@@ -968,10 +1023,135 @@ export namespace LibsignalProtocol {
       return sessionCipher.encrypt(javaStr.getBytes("UTF-8")).serialize();
     }
 
-    private decryptMessage(message: any, cipher) {
-      let signalMessage = Core.createPreKeySignalMessage(message);
-      let text = cipher.decrypt(signalMessage);
-      return new java.lang.String(text).toString();
+    private decryptMessage(message: any, cipher: any) {
+      let signalMessage;
+
+      try {
+        signalMessage = Core.createPreKeySignalMessage(message);
+        if (signalMessage) {
+          console.log('isPreKeySignalMessage');
+          let text = cipher.decrypt(signalMessage);
+          return new java.lang.String(text).toString();
+        } else {
+          console.log('Failed PreKeySignalMessage will try SignalMessage');
+          signalMessage = Core.createSignalMessage(message);
+
+          let text = cipher.decrypt(signalMessage);
+          return new java.lang.String(text).toString();
+        }
+      } catch (err) {
+        console.log('Unable to decrypt[1]');
+        console.log(err);
+      }
+
+      return new Error('Unable to decrypt[2]');
+    }
+
+    /**
+     * create a signal protocol address identifier
+     */
+    private createAddress() {
+      this.address = Core.createSignalProtocolAddress(this.username, this.deviceId);
+
+      return this.address;
+    }
+
+    /**
+     * generate or import an identity key pair
+     * 
+     * @param importedIdentityKeyPair An optional Base64 encoded IdentityKeyPair
+     * that was previously serialized.
+     */
+    private createIdentityKeyPair(importedIdentityKeyPair?: string) {
+      if (typeof importedIdentityKeyPair === 'undefined') {
+        this.identityKeyPair = KeyHelper.generateIdentityKeyPair();
+      } else {
+        this.identityKeyPair = Core.importIdentityKeyPair(Util.base64Decode(importedIdentityKeyPair));
+      }
+
+      return this.identityKeyPair;
+    }
+
+    /**
+     * generate or import a signed prekey record
+     * 
+     * @param importedSignedPreKey An optional Base64 encoded SignedPreKeyRecord that was
+     * previously serialized.
+     */
+    private createSignedPreKey(importedSignedPreKey: string) {
+      if (typeof importedSignedPreKey === 'undefined') {
+        this.signedPreKey = KeyHelper.generateSignedPreKey(this.identityKeyPair, this.random.nextInt(0xFFFFFF-1));
+      } else {
+        this.signedPreKey = Core.importSignedPreKeyRecord(Util.base64Decode(importedSignedPreKey));
+      }
+
+      return this.signedPreKey;
+    }
+
+    /**
+     * generate or import an array of unsigned prekey records
+     * - adds them to private array of prekey records (for export)
+     * - adds them to private array of prekey serialized records (for storage/import)
+     * - adds them to in-memory storage
+     * 
+     * @param importedPreKeys An optional array of pre-formatted PreKeyRecords to use instead of
+     * generating a new recordset
+     */
+    private createPreKeys(importedPreKeys: any[]) {
+      if (typeof importedPreKeys === 'undefined') {
+        let preKeys = KeyHelper.generatePreKeysFormatted(this.random.nextInt(0xFFFFFF-101), 100);
+        preKeys.forEach((preKeyFormatted) => {
+          try {
+            this.preKeys.push({
+              id: preKeyFormatted.keyId,
+              pubKey: preKeyFormatted.keyPair.pubKey,
+              serialized: preKeyFormatted.serialized
+            });
+
+            let preKeyRecord = Core.importPreKeyRecord(Util.base64Decode(preKeyFormatted.serialized));
+            this.store.storePreKey(preKeyRecord.getId(), preKeyRecord);
+          } catch (err) {
+            console.log('nope2');
+            console.log(err);
+          }
+        });
+      } else {
+        importedPreKeys.forEach((preKey) => {
+          let preKeyRecord = Core.importPreKeyRecord(Util.base64Decode(preKey.serialized));
+          let keyPair: TypeDef.ECKeyPair = preKeyRecord.getKeyPair();
+
+          this.preKeys.push({
+            id: preKeyRecord.getId(),
+            pubKey: Util.base64Encode(keyPair.getPublicKey().serialize()),
+            serialized: Util.base64Encode(preKeyRecord.serialize())
+          });
+
+          this.store.storePreKey(preKeyRecord.getId(), preKeyRecord);
+        });
+      }
+
+      return this.preKeys;
+    }
+
+    /**
+     * Imports an array of clients previously saved by creating a new session based on the
+     * contacts saved details.
+     * 
+     * @param importedContacts An optional array of formatted contacts that should be imported
+     * upon Client creation.
+     */
+    private createContacts(importedContacts: any[]) {
+      if (typeof importedContacts !== 'undefined' && importedContacts.length > 0) {
+        importedContacts.forEach(async (contact) => {
+          await this.addSession(contact.address, contact.preKeyBundle);
+          console.log(`...added ${contact.address.name} for ${this.username}`, {
+            hasContact: this.hasContact(contact.address.name),
+            hasSession: this.hasSession(contact.address.name)
+          });
+        });
+      }
+
+      return this.contacts;
     }
   }
 }
